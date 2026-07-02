@@ -180,6 +180,23 @@ describe('ListsComponent', () => {
     expect(component.sharedLists[0].title).toBe('Shared Trip');
   });
 
+  it('should filter out private lists that duplicate a shared list', () => {
+    const privateLists = [
+      { id: 'l1', title: 'Paris Trip', sections: [] },
+      { id: 'shared-id', title: 'Ghost List', sections: [] },
+    ];
+    const sharedLists = [
+      { id: 'shared-id', title: 'Real Shared List', sections: [], ownerEmail: 'friend@test.com', isShared: true },
+    ];
+    mockListService.getLists.and.returnValue(of(privateLists as any));
+    mockShareService.getSharedLists.and.returnValue(of(sharedLists as any));
+    component.ngOnInit();
+    expect(component.lists.length).toBe(1);
+    expect(component.lists[0].title).toBe('Paris Trip');
+    expect(component.sharedLists.length).toBe(1);
+    expect(component.sharedLists[0].title).toBe('Real Shared List');
+  });
+
   it('should navigate to shared list with shared prefix', () => {
     component.onClickSharedList('sl1');
     expect(mockRouter.navigate).toHaveBeenCalledWith(

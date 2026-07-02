@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { AngularFireDatabase } from '@angular/fire/compat/database';
-import { from, Observable, of, switchMap } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { combineLatest, from, Observable, of, switchMap } from 'rxjs';
+import { map, take } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { Group } from '../group/group';
 import { List } from '../lists/list';
@@ -45,21 +45,28 @@ export class ListService {
     return this.userPath().pipe(
       switchMap((path) => {
         if (!path) return of([]);
-        return this.db
-          .list(`${path}/lists`)
-          .snapshotChanges()
-          .pipe(
-            map((changes) =>
-              changes.map((c) => {
+        return combineLatest([
+          this.db.list(`${path}/lists`).snapshotChanges(),
+          this.db.object(`${path}/sharedListIds`).valueChanges(),
+        ]).pipe(
+          map(([changes, sharedListIds]) => {
+            const sharedIds = new Set(
+              sharedListIds && typeof sharedListIds === 'object'
+                ? Object.keys(sharedListIds)
+                : []
+            );
+            return changes
+              .filter((c) => !sharedIds.has(c.payload.key!))
+              .map((c) => {
                 const data = c.payload.val() as any;
                 return {
                   id: c.payload.key!,
                   title: data?.title ?? 'Untitled',
                   sections: this.parseSections(data?.sections),
                 } as List;
-              })
-            )
-          );
+              });
+          })
+        );
       })
     );
   }
@@ -87,6 +94,7 @@ export class ListService {
 
   addList(title: string): Observable<string | null> {
     return this.userPath().pipe(
+      take(1),
       switchMap((path) => {
         if (!path) return of(null);
         return from(
@@ -106,6 +114,7 @@ export class ListService {
 
   deleteList(id: string): Observable<void> {
     return this.userPath().pipe(
+      take(1),
       switchMap((path) => {
         if (!path) return of(undefined as void);
         return from(this.db.list(`${path}/lists`).remove(id));
@@ -115,6 +124,7 @@ export class ListService {
 
   addSectionToList(listId: string, group: Group): Observable<string | null> {
     return this.userPath().pipe(
+      take(1),
       switchMap((path) => {
         if (!path) return of(null);
         const sectionData = {
@@ -131,6 +141,7 @@ export class ListService {
 
   removeSectionFromList(listId: string, sectionId: string): Observable<void> {
     return this.userPath().pipe(
+      take(1),
       switchMap((path) => {
         if (!path) return of(undefined as void);
         return from(
@@ -146,6 +157,7 @@ export class ListService {
     items: string[]
   ): Observable<void> {
     return this.userPath().pipe(
+      take(1),
       switchMap((path) => {
         if (!path) return of(undefined as void);
         return from(
@@ -186,6 +198,23 @@ export class ListService {
       this.db
         .object(`sharedLists/${listId}/sections/${sectionId}`)
         .update({ items })
+    );
+  }
+
+  addSharedSectionToList(listId: string, group: Group): Observable<string | null> {
+    const sectionData = {
+      title: group.title,
+      items: [...group.items],
+      sourceGroupId: group.id,
+    };
+    return from(
+      this.db.list(`sharedLists/${listId}/sections`).push(sectionData)
+    ).pipe(map((ref) => ref.key));
+  }
+
+  removeSharedSectionFromList(listId: string, sectionId: string): Observable<void> {
+    return from(
+      this.db.list(`sharedLists/${listId}/sections`).remove(sectionId)
     );
   }
 }

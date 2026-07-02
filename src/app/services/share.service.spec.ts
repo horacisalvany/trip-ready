@@ -69,15 +69,14 @@ describe('ShareService', () => {
         },
       };
 
-      // First call reads the owner's list, subsequent calls are writes
-      let callCount = 0;
       mockDb.object.and.callFake((path: string) => {
-        callCount++;
         const obj = jasmine.createSpyObj('AngularFireObject', [
           'valueChanges',
           'set',
+          'remove',
         ]);
         obj.set.and.returnValue(Promise.resolve());
+        obj.remove.and.returnValue(Promise.resolve());
         if (path === 'users/ownerUid/lists/list1') {
           obj.valueChanges.and.returnValue(of(listData));
         }
@@ -112,8 +111,10 @@ describe('ShareService', () => {
       mockDb.object.and.callFake((path: string) => {
         const obj = jasmine.createSpyObj('AngularFireObject', [
           'valueChanges',
+          'set',
           'remove',
         ]);
+        obj.set.and.returnValue(Promise.resolve());
         obj.remove.and.returnValue(Promise.resolve());
         if (path === 'sharedLists/list1') {
           obj.valueChanges.and.returnValue(of(sharedListData));
@@ -127,6 +128,7 @@ describe('ShareService', () => {
             .allArgs()
             .map((args: any[]) => args[0]);
           expect(paths).toContain('sharedLists/list1');
+          expect(paths).toContain('users/ownerUid/lists/list1');
           expect(paths).toContain('users/ownerUid/sharedListIds/list1');
           expect(paths).toContain('users/friendUid/sharedListIds/list1');
           done();
@@ -153,16 +155,16 @@ describe('ShareService', () => {
         sections: {
           s1: { title: 'Essentials', items: ['sunscreen'] },
         },
-        ownerUid: 'ownerUid',
-        ownerEmail: 'owner@test.com',
-        sharedWith: { friendUid: 'friend@test.com' },
+        ownerUid: 'someoneElse',
+        ownerEmail: 'someone@test.com',
+        sharedWith: { ownerUid: 'owner@test.com' },
       };
       const sharedListData2 = {
         title: 'Mountain Trip',
         sections: {},
-        ownerUid: 'ownerUid',
-        ownerEmail: 'owner@test.com',
-        sharedWith: { friendUid: 'friend@test.com' },
+        ownerUid: 'anotherUser',
+        ownerEmail: 'another@test.com',
+        sharedWith: { ownerUid: 'owner@test.com' },
       };
 
       mockDb.object.and.callFake((path: string) => {
@@ -189,6 +191,47 @@ describe('ShareService', () => {
         expect(lists[1].id).toBe('list2');
         expect(lists[1].title).toBe('Mountain Trip');
         expect(lists[1].isShared).toBeTrue();
+        done();
+      });
+    });
+
+    it('should include lists owned by the current user (collaborative mode)', (done) => {
+      const sharedListIds = { list1: true, list2: true };
+      const sharedListData1 = {
+        title: 'My Shared List',
+        sections: {},
+        ownerUid: 'ownerUid',
+        ownerEmail: 'owner@test.com',
+        sharedWith: { friendUid: 'friend@test.com' },
+      };
+      const sharedListData2 = {
+        title: 'Friend List',
+        sections: {},
+        ownerUid: 'friendUid',
+        ownerEmail: 'friend@test.com',
+        sharedWith: { ownerUid: 'owner@test.com' },
+      };
+
+      mockDb.object.and.callFake((path: string) => {
+        const obj = jasmine.createSpyObj('AngularFireObject', [
+          'valueChanges',
+        ]);
+        if (path === 'users/ownerUid/sharedListIds') {
+          obj.valueChanges.and.returnValue(of(sharedListIds));
+        } else if (path === 'sharedLists/list1') {
+          obj.valueChanges.and.returnValue(of(sharedListData1));
+        } else if (path === 'sharedLists/list2') {
+          obj.valueChanges.and.returnValue(of(sharedListData2));
+        }
+        return obj;
+      });
+
+      service.getSharedLists().subscribe((lists) => {
+        expect(lists.length).toBe(2);
+        expect(lists[0].id).toBe('list1');
+        expect(lists[0].title).toBe('My Shared List');
+        expect(lists[1].id).toBe('list2');
+        expect(lists[1].title).toBe('Friend List');
         done();
       });
     });

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { AngularFireDatabase } from '@angular/fire/compat/database';
 import { from, Observable, of, switchMap } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { map, take } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { Group } from './group';
 
@@ -45,6 +45,7 @@ export class GroupService {
 
   updateGroup(id: string, updatedItems: string[]): Observable<void> {
     return this.userPath().pipe(
+      take(1),
       switchMap((path) => {
         if (!path) return of(undefined as void);
         return from(
@@ -58,6 +59,7 @@ export class GroupService {
 
   addGroup(title: string, items: string[] = []): Observable<string | null> {
     return this.userPath().pipe(
+      take(1),
       switchMap((path) => {
         if (!path) return of(null);
         return from(
@@ -69,6 +71,7 @@ export class GroupService {
 
   deleteGroup(id: string): Observable<void> {
     return this.userPath().pipe(
+      take(1),
       switchMap((path) => {
         if (!path) return of(undefined as void);
         return from(this.db.list(`${path}/groups`).remove(id));

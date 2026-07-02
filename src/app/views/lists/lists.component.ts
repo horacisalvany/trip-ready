@@ -37,8 +37,14 @@ export class ListsComponent implements OnInit {
     this.authService.user$.subscribe((user) => {
       this.currentUserUid = user?.uid ?? null;
     });
-    this.listService.getLists().subscribe((lists) => (this.lists = lists));
-    this.shareService.getSharedLists().subscribe((lists) => (this.sharedLists = lists));
+    this.listService.getLists().subscribe((lists) => {
+      this.lists = lists;
+      this.filterDuplicates();
+    });
+    this.shareService.getSharedLists().subscribe((lists) => {
+      this.sharedLists = lists;
+      this.filterDuplicates();
+    });
   }
 
   public onClickList(listId: string) {
@@ -73,6 +79,11 @@ export class ListsComponent implements OnInit {
 
   dropList(_event: CdkDragDrop<any>) {
     // List order is managed by Firebase; no local reorder needed
+  }
+
+  private filterDuplicates(): void {
+    const sharedIds = new Set(this.sharedLists.map((l) => l.id));
+    this.lists = this.lists.filter((l) => !sharedIds.has(l.id));
   }
 
   openDialogAddList(

@@ -66,23 +66,13 @@ export class ShareService {
                 sharedWith: { [targetUid]: targetEmail },
               };
 
-              // 3. Write all paths in parallel
+              // 3. Write all paths in parallel: publish to sharedLists,
+              //    register for both owner and target, remove from owner's personal lists
               return forkJoin([
-                from(
-                  this.db
-                    .object(`sharedLists/${listId}`)
-                    .set(sharedListData)
-                ),
-                from(
-                  this.db
-                    .object(`users/${ownerUid}/sharedListIds/${listId}`)
-                    .set(true)
-                ),
-                from(
-                  this.db
-                    .object(`users/${targetUid}/sharedListIds/${listId}`)
-                    .set(true)
-                ),
+                from(this.db.object(`sharedLists/${listId}`).set(sharedListData)),
+                from(this.db.object(`users/${ownerUid}/sharedListIds/${listId}`).set(true)),
+                from(this.db.object(`users/${targetUid}/sharedListIds/${listId}`).set(true)),
+                from(this.db.object(`users/${ownerUid}/lists/${listId}`).remove()),
               ]).pipe(map(() => undefined as void));
             })
           );
@@ -112,19 +102,18 @@ export class ShareService {
                 Object.keys(data.sharedWith).forEach((uid) => uids.add(uid));
               }
 
-              // Remove sharedListIds reference for every user + remove the shared list itself
-              const removals = Array.from(uids).map((uid) =>
-                from(
-                  this.db
-                    .object(`users/${uid}/sharedListIds/${listId}`)
-                    .remove()
-                )
-              );
-              removals.push(
-                from(this.db.object(`sharedLists/${listId}`).remove())
-              );
+              // Restore list to owner's personal lists, remove sharedListIds for all users,
+              // and remove the shared list node itself
+              const { ownerUid: owner, title, sections } = data;
+              const writes: Observable<any>[] = [
+                from(this.db.object(`sharedLists/${listId}`).remove()),
+                from(this.db.object(`users/${owner}/lists/${listId}`).set({ title, sections: sections ?? {} })),
+                ...Array.from(uids).map((uid) =>
+                  from(this.db.object(`users/${uid}/sharedListIds/${listId}`).remove())
+                ),
+              ];
 
-              return forkJoin(removals).pipe(map(() => undefined as void));
+              return forkJoin(writes).pipe(map(() => undefined as void));
             })
           );
       })

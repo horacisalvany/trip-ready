@@ -77,7 +77,10 @@ export class ListComponent implements OnInit {
       dialogRef.afterClosed().subscribe((selectedGroups: Group[]) => {
         if (selectedGroups && this.list) {
           selectedGroups.forEach((group) => {
-            this.listService.addSectionToList(this.list!.id, group).subscribe();
+            const obs = this.isShared
+              ? this.listService.addSharedSectionToList(this.list!.id, group)
+              : this.listService.addSectionToList(this.list!.id, group);
+            obs.subscribe();
           });
         }
       });
@@ -105,9 +108,10 @@ export class ListComponent implements OnInit {
     if (dragData?.type === 'section') {
       const section = this.list.sections.find((s) => s.id === dragData.id);
       if (section && this.isUngroupedSection(section.title)) return;
-      this.listService
-        .removeSectionFromList(this.list.id, dragData.id)
-        .subscribe();
+      const obs = this.isShared
+        ? this.listService.removeSharedSectionFromList(this.list.id, dragData.id)
+        : this.listService.removeSectionFromList(this.list.id, dragData.id);
+      obs.subscribe();
       return;
     }
 

@@ -32,6 +32,54 @@ describe('ListService', () => {
     service = TestBed.inject(ListService);
   });
 
+  describe('getLists', () => {
+    it('should exclude lists whose IDs appear in sharedListIds', (done) => {
+      const mockListRef = jasmine.createSpyObj('AngularFireList', ['snapshotChanges']);
+      const mockSharedIdsObj = jasmine.createSpyObj('AngularFireObject', ['valueChanges']);
+
+      mockListRef.snapshotChanges.and.returnValue(of([
+        { payload: { key: 'l1', val: () => ({ title: 'My Trip', sections: {} }) } },
+        { payload: { key: 'shared1', val: () => ({ title: 'Ghost', sections: {} }) } },
+      ]));
+      mockSharedIdsObj.valueChanges.and.returnValue(of({ shared1: true }));
+
+      mockDb.list.and.returnValue(mockListRef);
+      mockDb.object.and.callFake((path: string) => {
+        if (path === 'users/testUid/sharedListIds') return mockSharedIdsObj;
+        return mockDbObject;
+      });
+
+      service.getLists().subscribe((lists) => {
+        expect(lists.length).toBe(1);
+        expect(lists[0].id).toBe('l1');
+        expect(lists[0].title).toBe('My Trip');
+        done();
+      });
+    });
+
+    it('should return all lists when no sharedListIds exist', (done) => {
+      const mockListRef = jasmine.createSpyObj('AngularFireList', ['snapshotChanges']);
+      const mockSharedIdsObj = jasmine.createSpyObj('AngularFireObject', ['valueChanges']);
+
+      mockListRef.snapshotChanges.and.returnValue(of([
+        { payload: { key: 'l1', val: () => ({ title: 'Trip A', sections: {} }) } },
+        { payload: { key: 'l2', val: () => ({ title: 'Trip B', sections: {} }) } },
+      ]));
+      mockSharedIdsObj.valueChanges.and.returnValue(of(null));
+
+      mockDb.list.and.returnValue(mockListRef);
+      mockDb.object.and.callFake((path: string) => {
+        if (path === 'users/testUid/sharedListIds') return mockSharedIdsObj;
+        return mockDbObject;
+      });
+
+      service.getLists().subscribe((lists) => {
+        expect(lists.length).toBe(2);
+        done();
+      });
+    });
+  });
+
   describe('getSharedList', () => {
     it('should read from sharedLists path', (done) => {
       mockDbObject.valueChanges.and.returnValue(
@@ -63,6 +111,41 @@ describe('ListService', () => {
       service.updateSharedSectionItems('sharedId1', 'sec1', ['item1', 'item2']).subscribe(() => {
         expect(mockDb.object).toHaveBeenCalledWith('sharedLists/sharedId1/sections/sec1');
         expect(mockDbObject.update).toHaveBeenCalledWith({ items: ['item1', 'item2'] });
+        done();
+      });
+    });
+  });
+
+  describe('addSharedSectionToList', () => {
+    it('should push section to sharedLists path', (done) => {
+      const mockListRef = jasmine.createSpyObj('AngularFireList', ['push']);
+      mockListRef.push.and.returnValue(Promise.resolve({ key: 'newSectionKey' }));
+      mockDb.list.and.returnValue(mockListRef);
+
+      const group = { id: 'g1', title: 'Clothes', items: ['shirt', 'pants'] };
+
+      service.addSharedSectionToList('sharedId1', group).subscribe((key) => {
+        expect(mockDb.list).toHaveBeenCalledWith('sharedLists/sharedId1/sections');
+        expect(mockListRef.push).toHaveBeenCalledWith({
+          title: 'Clothes',
+          items: ['shirt', 'pants'],
+          sourceGroupId: 'g1',
+        });
+        expect(key).toBe('newSectionKey');
+        done();
+      });
+    });
+  });
+
+  describe('removeSharedSectionFromList', () => {
+    it('should remove section from sharedLists path', (done) => {
+      const mockListRef = jasmine.createSpyObj('AngularFireList', ['remove']);
+      mockListRef.remove.and.returnValue(Promise.resolve());
+      mockDb.list.and.returnValue(mockListRef);
+
+      service.removeSharedSectionFromList('sharedId1', 'sec1').subscribe(() => {
+        expect(mockDb.list).toHaveBeenCalledWith('sharedLists/sharedId1/sections');
+        expect(mockListRef.remove).toHaveBeenCalledWith('sec1');
         done();
       });
     });
