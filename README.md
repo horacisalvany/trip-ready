@@ -63,6 +63,10 @@ yarn test:prod    # Headless tests with coverage
 
 The data model uses Firebase Realtime Database with the following structure. Each user owns private lists stored under their UID. When a list is shared, a copy is written to a top-level `sharedLists/` node with ownership and collaborator metadata. A `userEmails/` node maps sanitized emails (dots replaced with commas) to UIDs for user lookup during sharing.
 
+![ER Diagram](docs/er-diagram.png)
+
+![Firebase Structure](docs/firebase-structure.png)
+
 ```mermaid
 erDiagram
     User ||--o{ List : owns
