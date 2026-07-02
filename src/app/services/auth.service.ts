@@ -8,6 +8,7 @@ import {
   signOut,
   user,
 } from '@angular/fire/auth';
+import { AngularFireDatabase } from '@angular/fire/compat/database';
 import { Observable, map } from 'rxjs';
 
 @Injectable({
@@ -17,19 +18,40 @@ export class AuthService {
   user$ = user(this.auth);
   isAuthenticated$: Observable<boolean> = this.user$.pipe(map((u) => !!u));
 
-  constructor(private auth: Auth) {}
+  constructor(private auth: Auth, private db: AngularFireDatabase) {}
 
-  login(email: string, password: string) {
-    return signInWithEmailAndPassword(this.auth, email, password);
+  sanitizeEmail(email: string): string {
+    return email.replace(/\./g, ',');
   }
 
-  loginWithGoogle() {
+  async registerEmailLookup(email: string, uid: string): Promise<void> {
+    const sanitized = this.sanitizeEmail(email);
+    await this.db.object(`userEmails/${sanitized}`).set(uid);
+  }
+
+  async login(email: string, password: string) {
+    const result = await signInWithEmailAndPassword(this.auth, email, password);
+    if (result.user?.email) {
+      await this.registerEmailLookup(result.user.email, result.user.uid);
+    }
+    return result;
+  }
+
+  async loginWithGoogle() {
     const provider = new GoogleAuthProvider();
-    return signInWithPopup(this.auth, provider);
+    const result = await signInWithPopup(this.auth, provider);
+    if (result.user?.email) {
+      await this.registerEmailLookup(result.user.email, result.user.uid);
+    }
+    return result;
   }
 
-  register(email: string, password: string) {
-    return createUserWithEmailAndPassword(this.auth, email, password);
+  async register(email: string, password: string) {
+    const result = await createUserWithEmailAndPassword(this.auth, email, password);
+    if (result.user?.email) {
+      await this.registerEmailLookup(result.user.email, result.user.uid);
+    }
+    return result;
   }
 
   logout() {

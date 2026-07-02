@@ -14,6 +14,7 @@ import { Group } from '../group/group';
 import { GroupService } from '../group/group.service';
 import { List } from '../lists/list';
 import { DialogAddGroupComponent } from './dialog-add-group/dialog-add-group.component';
+import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
 import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
 
 @Component({
@@ -25,6 +26,7 @@ import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
 })
 export class ListComponent implements OnInit {
   list: List | undefined;
+  isShared = false;
   /*
     Boolean to control that something has been dropped. Without there are bugs like missclicks after you drop a list on the trash
     and the popup of add a new list is opened for no reason.
@@ -39,13 +41,28 @@ export class ListComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.route.data.subscribe((data) => {
+      this.isShared = !!data['shared'];
+    });
+
     this.route.paramMap.subscribe((params) => {
       const id = params.get('id');
       if (id) {
-        this.listService.getList(id).subscribe((list) => {
+        const listObs = this.isShared
+          ? this.listService.getSharedList(id)
+          : this.listService.getList(id);
+        listObs.subscribe((list) => {
           this.list = list;
         });
       }
+    });
+  }
+
+  openShareDialog(): void {
+    if (!this.list) return;
+    this.dialog.open(DialogShareListComponent, {
+      width: '300px',
+      data: { listId: this.list.id },
     });
   }
 
@@ -60,7 +77,10 @@ export class ListComponent implements OnInit {
       dialogRef.afterClosed().subscribe((selectedGroups: Group[]) => {
         if (selectedGroups && this.list) {
           selectedGroups.forEach((group) => {
-            this.listService.addSectionToList(this.list!.id, group).subscribe();
+            const obs = this.isShared
+              ? this.listService.addSharedSectionToList(this.list!.id, group)
+              : this.listService.addSectionToList(this.list!.id, group);
+            obs.subscribe();
           });
         }
       });
@@ -72,9 +92,7 @@ export class ListComponent implements OnInit {
     const section = this.list.sections.find((s) => s.id === sectionId);
     if (section) {
       const updatedItems = [...section.items, item.trim()];
-      this.listService
-        .updateSectionItems(this.list.id, sectionId, updatedItems)
-        .subscribe();
+      this.updateItems(sectionId, updatedItems);
     }
   }
 
@@ -90,9 +108,10 @@ export class ListComponent implements OnInit {
     if (dragData?.type === 'section') {
       const section = this.list.sections.find((s) => s.id === dragData.id);
       if (section && this.isUngroupedSection(section.title)) return;
-      this.listService
-        .removeSectionFromList(this.list.id, dragData.id)
-        .subscribe();
+      const obs = this.isShared
+        ? this.listService.removeSharedSectionFromList(this.list.id, dragData.id)
+        : this.listService.removeSectionFromList(this.list.id, dragData.id);
+      obs.subscribe();
       return;
     }
 
@@ -102,9 +121,7 @@ export class ListComponent implements OnInit {
       );
       if (section) {
         section.items.splice(event.previousIndex, 1);
-        this.listService
-          .updateSectionItems(this.list.id, section.id, section.items)
-          .subscribe();
+        this.updateItems(section.id, section.items);
       }
     }
   }
@@ -122,18 +139,14 @@ export class ListComponent implements OnInit {
       const prevSectionId = this.resolveSectionId(event.previousContainer.id);
       const prevSection = this.list?.sections.find((s) => s.id === prevSectionId);
       if (prevSection && this.list) {
-        this.listService
-          .updateSectionItems(this.list.id, prevSection.id, prevSection.items)
-          .subscribe();
+        this.updateItems(prevSection.id, prevSection.items);
       }
     }
 
     const sectionId = this.resolveSectionId(event.container.id);
     const section = this.list?.sections.find((s) => s.id === sectionId);
     if (section && this.list) {
-      this.listService
-        .updateSectionItems(this.list.id, section.id, section.items)
-        .subscribe();
+      this.updateItems(section.id, section.items);
     }
   }
 
@@ -145,6 +158,14 @@ export class ListComponent implements OnInit {
       .filter((s) => s.id !== sectionId)
       .map((s) => 'cdk-drop-list-section-' + s.id);
     return ['trash-list', ...otherIds];
+  }
+
+  private updateItems(sectionId: string, items: string[]): void {
+    if (!this.list) return;
+    const obs = this.isShared
+      ? this.listService.updateSharedSectionItems(this.list.id, sectionId, items)
+      : this.listService.updateSectionItems(this.list.id, sectionId, items);
+    obs.subscribe();
   }
 
   private resolveSectionId(containerId: string): string {

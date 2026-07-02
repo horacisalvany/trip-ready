@@ -1,0 +1,15 @@
+<h2 mat-dialog-title>Share List</h2>
+<mat-dialog-content>
+  <mat-form-field appearance="outline" class="full-width">
+    <mat-label>Email address</mat-label>
+    <input matInput [(ngModel)]="email" type="email" placeholder="friend@example.com" />
+  </mat-form-field>
+  <p class="error-message" *ngIf="errorMessage">{{ errorMessage }}</p>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onShare()" [disabled]="loading">
+    <span *ngIf="!loading">Share</span>
+    <mat-spinner *ngIf="loading" diameter="20"></mat-spinner>
+  </button>
+</mat-dialog-actions>

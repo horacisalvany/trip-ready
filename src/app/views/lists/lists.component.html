@@ -29,4 +29,21 @@
       <span class="list-title">{{ list.title }}</span>
     </mat-list-item>
   </mat-list>
+
+  <div *ngIf="sharedLists.length > 0" class="shared-section">
+    <h2 class="shared-heading">Shared with me</h2>
+    <mat-list role="list" cdkDropList (cdkDropListDropped)="dropList($event)">
+      <mat-list-item
+        *ngFor="let list of sharedLists"
+        cdkDrag
+        [cdkDragData]="{ type: 'shared', id: list.id, ownerUid: list.ownerUid }"
+        (click)="onClickSharedList(list.id)"
+      >
+        <mat-icon cdkDragHandle class="drag-handle">drag_indicator</mat-icon>
+        <mat-icon class="shared-icon">people</mat-icon>
+        <span class="list-title">{{ list.title }}</span>
+        <span class="shared-owner">by {{ list.ownerEmail }}</span>
+      </mat-list-item>
+    </mat-list>
+  </div>
 </div>

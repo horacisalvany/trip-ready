@@ -12,6 +12,7 @@ const routes: Routes = [
   { path: '', component: MainMenuComponent, canActivate: [AuthGuard] },
   { path: 'group', component: GroupComponent, canActivate: [AuthGuard] },
   { path: 'list', component: ListsComponent, canActivate: [AuthGuard] },
+  { path: 'list/shared/:id', component: ListComponent, canActivate: [AuthGuard], data: { shared: true } },
   { path: 'list/:id', component: ListComponent, canActivate: [AuthGuard] },
 ];
 

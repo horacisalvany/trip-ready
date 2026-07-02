@@ -25,6 +25,10 @@ src/app/
     
 ```
 
+## Product Specification
+
+See [`docs/spec.md`](docs/spec.md) for the expected behavior of the application. Before implementing a feature or fixing a bug, read the relevant section. If the spec doesn't cover the case, ask the user to clarify and update the spec before writing code.
+
 ## New code
 All new code added must be tested somehow in a unit test.
 
@@ -45,6 +49,35 @@ yarn test:prod    # Run tests headless with coverage
 - Services are provided at component level or in `app.module.ts`
 - Firebase configuration is in `src/environments/environment.ts`
 - Dialog components are nested within their parent view folders (e.g., `dialog-add-list/`)
+
+## Critical Pattern: `take(1)` on write operations
+
+Any service method that **writes** to Firebase and sources the user path from `authService.user$` (via `userPath()`) **must** include `take(1)` before the `switchMap`:
+
+```ts
+// CORRECT
+someWriteMethod(): Observable<void> {
+  return this.userPath().pipe(
+    take(1),           // <-- required on all writes
+    switchMap((path) => { ... })
+  );
+}
+
+// WRONG — missing take(1)
+someWriteMethod(): Observable<void> {
+  return this.userPath().pipe(
+    switchMap((path) => { ... })
+  );
+}
+```
+
+**Why this matters:** `authService.user$` is a long-lived observable that emits every time the auth state changes (login, logout, user switch). Without `take(1)`, the subscription stays open after the write completes. When a different user logs in, `user$` emits their UID, `switchMap` re-triggers the write under the new user's path — silently duplicating or corrupting data across user accounts.
+
+**Rule of thumb:**
+- Write operations (`add`, `update`, `delete`) → always use `take(1)`
+- Read/stream operations (`get`, `list`) → do NOT use `take(1)`, they need to stay alive
+
+This was discovered as a real bug: lists and groups created by one user were being cloned into other users' accounts on login.
 
 ## Development Notes
 

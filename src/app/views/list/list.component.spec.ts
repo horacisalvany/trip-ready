@@ -8,6 +8,7 @@ import { ActivatedRoute } from '@angular/router';
 import { of, Subject } from 'rxjs';
 import { ListComponent } from './list.component';
 import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
+import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
 import { GroupService } from '../group/group.service';
 import { Group } from '../group/group';
 import { List } from '../lists/list';
@@ -40,9 +41,11 @@ describe('ListComponent', () => {
   beforeEach(async () => {
     mockListService = jasmine.createSpyObj('ListService', [
       'getList',
+      'getSharedList',
       'addSectionToList',
       'removeSectionFromList',
       'updateSectionItems',
+      'updateSharedSectionItems',
     ]);
     mockListService.getList.and.returnValue(
       of({
@@ -53,6 +56,8 @@ describe('ListComponent', () => {
     mockListService.addSectionToList.and.returnValue(of('newSectionId'));
     mockListService.removeSectionFromList.and.returnValue(of(undefined));
     mockListService.updateSectionItems.and.returnValue(of(undefined));
+    mockListService.getSharedList.and.returnValue(of({...MOCK_LIST, isShared: true, sections: MOCK_LIST.sections.map(s => ({...s, items: [...s.items]}))}));
+    mockListService.updateSharedSectionItems.and.returnValue(of(undefined));
 
     mockGroupService = jasmine.createSpyObj('GroupService', ['getGroups']);
     mockGroupService.getGroups.and.returnValue(
@@ -68,6 +73,7 @@ describe('ListComponent', () => {
           provide: ActivatedRoute,
           useValue: {
             paramMap: of({ get: () => 'list1' }),
+            data: of({}),
           },
         },
       ],
@@ -421,6 +427,39 @@ describe('ListComponent', () => {
     expect(component.dialog.open).toHaveBeenCalledTimes(1);
   });
 
+  // --- share button ---
+
+  it('should open share dialog when share button is clicked', () => {
+    const dialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
+    dialogRef.afterClosed.and.returnValue(of(false));
+    spyOn(component.dialog, 'open').and.returnValue(dialogRef);
+
+    component.openShareDialog();
+
+    expect(component.dialog.open).toHaveBeenCalledWith(
+      DialogShareListComponent,
+      jasmine.objectContaining({
+        width: '300px',
+        data: { listId: 'list1' },
+      })
+    );
+  });
+
+  it('should not open share dialog when list is undefined', () => {
+    component.list = undefined;
+    spyOn(component.dialog, 'open');
+
+    component.openShareDialog();
+
+    expect(component.dialog.open).not.toHaveBeenCalled();
+  });
+
+  // --- shared mode ---
+
+  it('should have isShared false by default', () => {
+    expect(component.isShared).toBeFalse();
+  });
+
   // --- route param handling ---
 
   it('should not call getList when route param id is null', async () => {
@@ -436,6 +475,7 @@ describe('ListComponent', () => {
           provide: ActivatedRoute,
           useValue: {
             paramMap: of({ get: () => null }),
+            data: of({}),
           },
         },
       ],
