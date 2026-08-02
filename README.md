@@ -57,7 +57,10 @@ yarn build        # Development build
 yarn build:prod   # Production build
 yarn test         # Run tests (Karma)
 yarn test:prod    # Headless tests with coverage
+yarn deploy       # Build for production and deploy to Firebase Hosting
 ```
+
+See [`docs/deploy.md`](docs/deploy.md) for full deployment instructions.
 
 ## Entity Relation Diagram
 
