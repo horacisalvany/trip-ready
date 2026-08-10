@@ -48,32 +48,54 @@ export class ShareService {
         const ownerUid = user.uid;
         const ownerEmail = user.email ?? '';
 
-        // 1. Read the current list data
+        // 1. Check whether the list is already shared
         return this.db
-          .object(`users/${ownerUid}/lists/${listId}`)
+          .object(`sharedLists/${listId}`)
           .valueChanges()
           .pipe(
             take(1),
-            switchMap((listData: any) => {
-              if (!listData) return of(undefined as void);
+            switchMap((existingSharedListData: any) => {
+              if (existingSharedListData) {
+                // Already shared: merge the new recipient into sharedWith
+                // instead of overwriting the whole node (would drop other recipients)
+                return forkJoin([
+                  from(
+                    this.db
+                      .object(`sharedLists/${listId}/sharedWith/${targetUid}`)
+                      .set(targetEmail)
+                  ),
+                  from(this.db.object(`users/${targetUid}/sharedListIds/${listId}`).set(true)),
+                ]).pipe(map(() => undefined as void));
+              }
 
-              // 2. Build the shared list object
-              const sharedListData = {
-                title: listData.title,
-                sections: listData.sections ?? {},
-                ownerUid,
-                ownerEmail,
-                sharedWith: { [targetUid]: targetEmail },
-              };
+              // 2. Not yet shared: read the current private list data
+              return this.db
+                .object(`users/${ownerUid}/lists/${listId}`)
+                .valueChanges()
+                .pipe(
+                  take(1),
+                  switchMap((listData: any) => {
+                    if (!listData) return of(undefined as void);
 
-              // 3. Write all paths in parallel: publish to sharedLists,
-              //    register for both owner and target, remove from owner's personal lists
-              return forkJoin([
-                from(this.db.object(`sharedLists/${listId}`).set(sharedListData)),
-                from(this.db.object(`users/${ownerUid}/sharedListIds/${listId}`).set(true)),
-                from(this.db.object(`users/${targetUid}/sharedListIds/${listId}`).set(true)),
-                from(this.db.object(`users/${ownerUid}/lists/${listId}`).remove()),
-              ]).pipe(map(() => undefined as void));
+                    // 3. Build the shared list object
+                    const sharedListData = {
+                      title: listData.title,
+                      sections: listData.sections ?? {},
+                      ownerUid,
+                      ownerEmail,
+                      sharedWith: { [targetUid]: targetEmail },
+                    };
+
+                    // 4. Write all paths in parallel: publish to sharedLists,
+                    //    register for both owner and target, remove from owner's personal lists
+                    return forkJoin([
+                      from(this.db.object(`sharedLists/${listId}`).set(sharedListData)),
+                      from(this.db.object(`users/${ownerUid}/sharedListIds/${listId}`).set(true)),
+                      from(this.db.object(`users/${targetUid}/sharedListIds/${listId}`).set(true)),
+                      from(this.db.object(`users/${ownerUid}/lists/${listId}`).remove()),
+                    ]).pipe(map(() => undefined as void));
+                  })
+                );
             })
           );
       })
