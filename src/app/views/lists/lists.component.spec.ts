@@ -19,6 +19,17 @@ const MOCK_LISTS: List[] = [
   { id: 'l2', title: 'Weekend Getaway', sections: [] },
 ];
 
+const MOCK_SHARED_LISTS: List[] = [
+  {
+    id: 's1',
+    title: 'Shared Trip',
+    sections: [],
+    isShared: true,
+    ownerUid: 'otherUid',
+    ownerEmail: 'other@test.com',
+  },
+];
+
 describe('ListsComponent', () => {
   let component: ListsComponent;
   let fixture: ComponentFixture<ListsComponent>;
@@ -255,23 +266,12 @@ describe('ListsComponent', () => {
 
   // --- touch drag delay (mobile scrolling) ---
 
-  it('should apply the shared touch drag delay to private list cards', () => {
-    expectAllDragsHaveStartDelay(fixture, 2);
-  });
-
-  it('should apply the shared touch drag delay to shared list cards', () => {
-    component.sharedLists = [
-      {
-        id: 's1',
-        title: 'Shared Trip',
-        sections: [],
-        ownerUid: 'otherUid',
-        ownerEmail: 'other@test.com',
-      },
-    ];
+  it('should apply the shared touch drag delay to every draggable', () => {
+    mockShareService.getSharedLists.and.returnValue(of(MOCK_SHARED_LISTS));
+    component.ngOnInit();
     fixture.detectChanges();
 
-    // 2 private lists + 1 shared list
+    // 2 private lists from MOCK_LISTS + 1 shared list
     expectAllDragsHaveStartDelay(fixture, 3);
   });
 });

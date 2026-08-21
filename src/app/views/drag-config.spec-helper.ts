@@ -13,9 +13,18 @@ export function expectAllDragsHaveStartDelay(
   expectedCount: number
 ): void {
   const dragElements = fixture.debugElement.queryAll(By.css('[cdkDrag]'));
-  expect(dragElements.length).toBe(expectedCount);
+  expect(dragElements.length)
+    .withContext(
+      'number of [cdkDrag] elements — if you added a draggable, bind ' +
+        '[cdkDragStartDelay]="dragStartDelay" and update the expected count'
+    )
+    .toBe(expectedCount);
 
-  dragElements.forEach((el) =>
-    expect(el.injector.get(CdkDrag).dragStartDelay).toEqual(DRAG_START_DELAY)
+  dragElements.forEach((el, i) =>
+    expect(el.injector.get(CdkDrag).dragStartDelay)
+      .withContext(
+        `[cdkDrag] #${i} (<${el.nativeElement.nodeName.toLowerCase()}>) is missing [cdkDragStartDelay]`
+      )
+      .toEqual(DRAG_START_DELAY)
   );
 }

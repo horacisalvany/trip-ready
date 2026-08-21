@@ -149,12 +149,6 @@ describe('ListComponent', () => {
     expect(dropList!.id).toBe('trash-list');
   });
 
-  it('should render sections and items as cdkDrag elements', () => {
-    // 3 sections + 4 items (2 in Packing + 2 in Electronics)
-    const dragElements = fixture.debugElement.queryAll(By.css('[cdkDrag]'));
-    expect(dragElements.length).toBe(7);
-  });
-
   it('should apply the shared touch drag delay to every draggable', () => {
     // 3 sections + 4 items (2 in Packing + 2 in Electronics)
     expectAllDragsHaveStartDelay(fixture, 7);
