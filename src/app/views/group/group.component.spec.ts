@@ -318,7 +318,7 @@ describe('GroupComponent', () => {
 
   // --- touch drag delay (mobile scrolling) ---
 
-  it('should set the touch drag delay on every draggable so a swipe scrolls', () => {
+  it('should apply the shared touch drag delay to every draggable', () => {
     // 2 group cards + 4 items (2 in Packing + 2 in Documents)
     const dragElements = fixture.debugElement.queryAll(By.css('[cdkDrag]'));
     expect(dragElements.length).toBe(6);
