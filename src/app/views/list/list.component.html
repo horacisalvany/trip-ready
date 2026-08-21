@@ -21,6 +21,7 @@
       class="col-6 col-md-4"
       cdkDrag
       [cdkDragData]="{ type: 'section', id: section.id }"
+      [cdkDragStartDelay]="dragStartDelay"
       [cdkDragDisabled]="isUngroupedSection(section.title)"
       cdkDropList
       [cdkDropListConnectedTo]="['trash-list']"
@@ -41,6 +42,7 @@
         <mat-list-item
           cdkDrag
           [cdkDragData]="{ type: 'item', sectionId: section.id }"
+          [cdkDragStartDelay]="dragStartDelay"
           *ngFor="let item of section.items"
         >{{ item }}</mat-list-item>
       </mat-list>

@@ -3,7 +3,7 @@ import { By } from '@angular/platform-browser';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
-import { CdkDropList, DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
+import { CdkDrag, CdkDropList, DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { ActivatedRoute } from '@angular/router';
 import { of, Subject } from 'rxjs';
 import { ListComponent } from './list.component';
@@ -13,6 +13,7 @@ import { GroupService } from '../group/group.service';
 import { Group } from '../group/group';
 import { List } from '../lists/list';
 import { Section } from './section';
+import { DRAG_START_DELAY } from '../drag-config';
 
 const MOCK_SECTIONS: Section[] = [
   { id: 'ungrouped', title: UNGROUPED_SECTION_TITLE, items: [] },
@@ -152,6 +153,16 @@ describe('ListComponent', () => {
     // 3 sections + 4 items (2 in Packing + 2 in Electronics)
     const dragElements = fixture.debugElement.queryAll(By.css('[cdkDrag]'));
     expect(dragElements.length).toBe(7);
+  });
+
+  it('should apply the shared touch drag delay to every draggable', () => {
+    // 3 sections + 4 items (2 in Packing + 2 in Electronics)
+    const dragElements = fixture.debugElement.queryAll(By.css('[cdkDrag]'));
+    expect(dragElements.length).toBe(7);
+
+    dragElements.forEach((el) =>
+      expect(el.injector.get(CdkDrag).dragStartDelay).toEqual(DRAG_START_DELAY)
+    );
   });
 
   // --- ungrouped section ---
