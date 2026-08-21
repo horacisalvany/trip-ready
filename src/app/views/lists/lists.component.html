@@ -23,6 +23,7 @@
       *ngFor="let list of lists"
       cdkDrag
       [cdkDragData]="list.id"
+      [cdkDragStartDelay]="dragStartDelay"
       (click)="onClickList(list.id)"
     >
       <mat-icon cdkDragHandle class="drag-handle">drag_indicator</mat-icon>
@@ -37,6 +38,7 @@
         *ngFor="let list of sharedLists"
         cdkDrag
         [cdkDragData]="{ type: 'shared', id: list.id, ownerUid: list.ownerUid }"
+        [cdkDragStartDelay]="dragStartDelay"
         (click)="onClickSharedList(list.id)"
       >
         <mat-icon cdkDragHandle class="drag-handle">drag_indicator</mat-icon>

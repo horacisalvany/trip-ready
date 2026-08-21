@@ -1,8 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
-import { DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
+import { CdkDrag, DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -12,6 +13,7 @@ import { AuthService } from '../../services/auth.service';
 import { ListService } from '../list/list.service';
 import { ShareService } from '../../services/share.service';
 import { List } from './list';
+import { DRAG_START_DELAY } from '../drag-config';
 
 const MOCK_LISTS: List[] = [
   { id: 'l1', title: 'Paris Trip', sections: [] },
@@ -250,5 +252,37 @@ describe('ListsComponent', () => {
 
     expect(mockListService.deleteList).not.toHaveBeenCalled();
     expect(mockShareService.deleteSharedList).not.toHaveBeenCalled();
+  });
+
+  // --- touch drag delay (mobile scrolling) ---
+
+  it('should apply the shared touch drag delay to private list cards', () => {
+    const dragElements = fixture.debugElement.queryAll(By.css('[cdkDrag]'));
+    expect(dragElements.length).toBe(2);
+
+    dragElements.forEach((el) =>
+      expect(el.injector.get(CdkDrag).dragStartDelay).toEqual(DRAG_START_DELAY)
+    );
+  });
+
+  it('should apply the shared touch drag delay to shared list cards', () => {
+    component.sharedLists = [
+      {
+        id: 's1',
+        title: 'Shared Trip',
+        sections: [],
+        ownerUid: 'otherUid',
+        ownerEmail: 'other@test.com',
+      },
+    ];
+    fixture.detectChanges();
+
+    // 2 private lists + 1 shared list
+    const dragElements = fixture.debugElement.queryAll(By.css('[cdkDrag]'));
+    expect(dragElements.length).toBe(3);
+
+    dragElements.forEach((el) =>
+      expect(el.injector.get(CdkDrag).dragStartDelay).toEqual(DRAG_START_DELAY)
+    );
   });
 });
