@@ -25,6 +25,7 @@
         class="col-md-4"
         cdkDrag
         [cdkDragData]="{ type: 'group', id: group.id }"
+        [cdkDragStartDelay]="dragStartDelay"
       >
         <div class="group-header" cdkDragHandle>
           <mat-icon class="drag-handle">drag_indicator</mat-icon>
@@ -41,6 +42,7 @@
           <mat-list-item
             cdkDrag
             [cdkDragData]="{ type: 'item' }"
+            [cdkDragStartDelay]="dragStartDelay"
             *ngFor="let item of group.items"
             >{{ item }}</mat-list-item
           >

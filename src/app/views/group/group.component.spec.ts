@@ -1,11 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
+import { CdkDrag, DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { of } from 'rxjs';
 import { GroupComponent } from './group.component';
 import { GroupService } from './group.service';
 import { Group } from './group';
+import { DRAG_START_DELAY } from '../drag-config';
 
 const MOCK_GROUPS: Group[] = [
   { id: 'g1', title: 'Packing', items: ['Passport', 'Tickets'] },
@@ -312,5 +314,17 @@ describe('GroupComponent', () => {
 
     expect(mockDialog.open).toHaveBeenCalled();
     expect(mockGroupService.addGroup).not.toHaveBeenCalled();
+  });
+
+  // --- touch drag delay (mobile scrolling) ---
+
+  it('should set the touch drag delay on every draggable so a swipe scrolls', () => {
+    // 2 group cards + 4 items (2 in Packing + 2 in Documents)
+    const dragElements = fixture.debugElement.queryAll(By.css('[cdkDrag]'));
+    expect(dragElements.length).toBe(6);
+
+    dragElements.forEach((el) =>
+      expect(el.injector.get(CdkDrag).dragStartDelay).toEqual(DRAG_START_DELAY)
+    );
   });
 });
