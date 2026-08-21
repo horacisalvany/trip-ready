@@ -3,9 +3,21 @@
 html, body { height: 100%; }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 
-/* A long press on a draggable starts a drag (see DRAG_START_DELAY), so suppress the
-   native text-selection callout that iOS would otherwise pop mid-gesture. */
+/* --- Drag & drop (global) --- */
+
+/* A long press on a draggable starts a drag (see DRAG_START_DELAY in
+   src/app/views/drag-config.ts), so suppress the native text-selection callout
+   that iOS would otherwise pop mid-gesture. */
 .cdk-drag {
   -webkit-touch-callout: none;
   user-select: none;
+}
+
+/* Form fields inside a draggable still need native text editing (paste, caret
+   placement, the iOS selection menu). They can't start a drag anyway — the cards
+   that contain them restrict dragging to their cdkDragHandle header. */
+.cdk-drag input,
+.cdk-drag textarea {
+  -webkit-touch-callout: default;
+  user-select: text;
 }
