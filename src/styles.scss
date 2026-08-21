@@ -2,3 +2,10 @@
 
 html, body { height: 100%; }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+/* A long press on a draggable starts a drag (see DRAG_START_DELAY), so suppress the
+   native text-selection callout that iOS would otherwise pop mid-gesture. */
+.cdk-drag {
+  -webkit-touch-callout: none;
+  user-select: none;
+}

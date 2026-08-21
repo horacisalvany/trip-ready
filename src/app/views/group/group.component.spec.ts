@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
@@ -320,5 +321,11 @@ describe('GroupComponent', () => {
   it('should apply the shared touch drag delay to every draggable', () => {
     // 2 group cards + 4 items (2 in Packing + 2 in Documents)
     expectAllDragsHaveStartDelay(fixture, 6);
+  });
+
+  it('should suppress text selection on draggables so a long press does not select text', () => {
+    const dragElement = fixture.debugElement.query(By.css('.cdk-drag'));
+    expect(dragElement).toBeTruthy();
+    expect(getComputedStyle(dragElement.nativeElement).userSelect).toBe('none');
   });
 });
