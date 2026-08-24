@@ -77,9 +77,9 @@ describe('ShareService', () => {
         ]);
         obj.set.and.returnValue(Promise.resolve());
         obj.remove.and.returnValue(Promise.resolve());
-        if (path === 'users/ownerUid/lists/list1') {
-          obj.valueChanges.and.returnValue(of(listData));
-        }
+        obj.valueChanges.and.returnValue(
+          path === 'users/ownerUid/lists/list1' ? of(listData) : of(null)
+        );
         return obj;
       });
 
@@ -92,6 +92,53 @@ describe('ShareService', () => {
           expect(paths).toContain('sharedLists/list1');
           expect(paths).toContain('users/ownerUid/sharedListIds/list1');
           expect(paths).toContain('users/targetUid/sharedListIds/list1');
+          done();
+        },
+        error: done.fail,
+      });
+    });
+
+    it('should merge the new recipient into sharedWith instead of overwriting the whole node when the list is already shared', (done) => {
+      const existingSharedListData = {
+        title: 'Beach Trip',
+        sections: {
+          s1: { title: 'Essentials', items: ['sunscreen'] },
+        },
+        ownerUid: 'ownerUid',
+        ownerEmail: 'owner@test.com',
+        sharedWith: { friendUid: 'friend@test.com' },
+      };
+
+      const objectsByPath = new Map<string, jasmine.SpyObj<any>>();
+
+      mockDb.object.and.callFake((path: string) => {
+        if (!objectsByPath.has(path)) {
+          const obj = jasmine.createSpyObj('AngularFireObject', [
+            'valueChanges',
+            'set',
+            'remove',
+          ]);
+          obj.set.and.returnValue(Promise.resolve());
+          obj.remove.and.returnValue(Promise.resolve());
+          obj.valueChanges.and.returnValue(
+            path === 'sharedLists/list1' ? of(existingSharedListData) : of(null)
+          );
+          objectsByPath.set(path, obj);
+        }
+        return objectsByPath.get(path);
+      });
+
+      service.shareList('list1', 'newTargetUid', 'new@test.com').subscribe({
+        next: () => {
+          expect(
+            objectsByPath.get('sharedLists/list1')?.set
+          ).not.toHaveBeenCalled();
+          expect(
+            objectsByPath.get('sharedLists/list1/sharedWith/newTargetUid')?.set
+          ).toHaveBeenCalledWith('new@test.com');
+          expect(
+            objectsByPath.get('users/newTargetUid/sharedListIds/list1')?.set
+          ).toHaveBeenCalledWith(true);
           done();
         },
         error: done.fail,
