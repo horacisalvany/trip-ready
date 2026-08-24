@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TripReady - Shared Lists Data Model</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            line-height: 1.6;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(90deg, #3f51b5, #9c27b0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle {
+            color: #64748b;
+            font-size: 1rem;
+            margin-bottom: 2rem;
+        }
+        h2 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #3f51b5;
+            margin: 2rem 0 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        .diagram-caption {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #64748b;
+            margin-top: 0.75rem;
+            font-style: italic;
+        }
+        .legend {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0.5rem;
+        }
+        th, td {
+            text-align: left;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 0.9rem;
+        }
+        th {
+            background: #f1f5f9;
+            font-weight: 600;
+            color: #475569;
+        }
+        code {
+            background: #f1f5f9;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: #7c3aed;
+        }
+        .diagram-download {
+            display: inline-flex;
+            gap: 0.5rem;
+            margin-left: 1rem;
+        }
+        .diagram-download button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background 0.3s;
+            font-weight: 500;
+        }
+        .diagram-download button:hover { background: #5568d3; }
+        .diagram-download button.png-btn {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        }
+        .diagram-download button.png-btn:hover {
+            background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+        }
+    </style>
+</head>
+<body>
+    <h1>TripReady - Shared Lists Data Model</h1>
+    <p class="subtitle">Entity relationships and Firebase data structure for the shared lists feature</p>
+
+    <h2>1. Entity Relationship Diagram</h2>
+    <div class="card">
+        <div class="mermaid">
+erDiagram
+    USER {
+        string uid PK
+        string email
+    }
+
+    LIST {
+        string id PK
+        string title
+        string ownerUid FK
+        string ownerEmail
+        boolean isShared
+    }
+
+    SECTION {
+        string id PK
+        string title
+        string sourceGroupId FK
+    }
+
+    ITEM {
+        string value
+    }
+
+    GROUP {
+        string id PK
+        string title
+    }
+
+    SHARED_LIST {
+        string id PK
+        string title
+        string ownerUid FK
+        string ownerEmail
+    }
+
+    USER_EMAILS {
+        string sanitizedEmail PK
+        string uid FK
+    }
+
+    SHARED_LIST_IDS {
+        string listId PK
+        boolean reference
+    }
+
+    USER ||--o{ LIST : "owns"
+    USER ||--o{ GROUP : "has"
+    USER ||--|| USER_EMAILS : "registers"
+    USER ||--o{ SHARED_LIST_IDS : "references"
+
+    LIST ||--o{ SECTION : "contains"
+    SECTION ||--o{ ITEM : "has"
+    GROUP ||--o{ ITEM : "has"
+    SECTION }o--o| GROUP : "sourced from"
+
+    SHARED_LIST ||--o{ SECTION : "contains"
+    SHARED_LIST }o--o{ USER : "sharedWith"
+    SHARED_LIST_IDS }o--|| SHARED_LIST : "points to"
+    USER ||--o{ SHARED_LIST : "owns"
+        </div>
+        <div class="diagram-caption">Figure 1: Entity Relationship Diagram</div>
+    </div>
+
+    <h2>2. Firebase Data Structure</h2>
+    <div class="card">
+        <div class="mermaid">
+graph TD
+    ROOT["Firebase Root"] --> USERS["users/"]
+    ROOT --> UE["userEmails/"]
+    ROOT --> SL["sharedLists/"]
+
+    USERS --> UID["{uid}/"]
+    UID --> LISTS["lists/"]
+    UID --> GROUPS["groups/"]
+    UID --> SLIDS["sharedListIds/"]
+
+    LISTS --> LID["{listId}/"]
+    LID --> LT["title: string"]
+    LID --> SECS["sections/"]
+    SECS --> SEC["{sectionId}/"]
+    SEC --> STITLE["title: string"]
+    SEC --> SITEMS["items: string[ ]"]
+    SEC --> SGID["sourceGroupId?: string"]
+
+    GROUPS --> GID["{groupId}/"]
+    GID --> GT["title: string"]
+    GID --> GITEMS["items: string[ ]"]
+
+    SLIDS --> SLREF["{listId}: true"]
+
+    UE --> EMAIL["{email,with,commas}: uid"]
+
+    SL --> SLID["{listId}/"]
+    SLID --> SLT["title: string"]
+    SLID --> SLSECS["sections/ (same structure)"]
+    SLID --> OUID["ownerUid: string"]
+    SLID --> OEM["ownerEmail: string"]
+    SLID --> SW["sharedWith/"]
+    SW --> SWENTRY["{targetUid}: email"]
+
+    style ROOT fill:#1e293b,color:#fff
+    style USERS fill:#3f51b5,color:#fff
+    style UE fill:#9c27b0,color:#fff
+    style SL fill:#e65100,color:#fff
+    style LISTS fill:#5c6bc0,color:#fff
+    style GROUPS fill:#5c6bc0,color:#fff
+    style SLIDS fill:#7b1fa2,color:#fff
+    style SLREF fill:#ce93d8
+    style EMAIL fill:#ce93d8
+    style SW fill:#ff7043,color:#fff
+    style SWENTRY fill:#ffab91
+        </div>
+        <div class="diagram-caption">Figure 2: Firebase Realtime Database Structure</div>
+    </div>
+
+    <h2>3. Share Flow</h2>
+    <div class="card">
+        <div class="mermaid">
+sequenceDiagram
+    participant Owner as Owner (User A)
+    participant Recipient as Recipient (User B)
+    participant App as TripReady App
+    participant FB as Firebase RTDB
+
+    rect rgb(230, 243, 255)
+        Note over Owner, FB: Step 1 - Owner clicks Share
+        Owner->>App: Enter email: friend@example.com
+        App->>FB: Read userEmails/friend@example,com
+        FB-->>App: targetUid: "uid456"
+    end
+
+    rect rgb(226, 240, 217)
+        Note over Owner, FB: Step 2 - Publish to shared path
+        App->>FB: Write sharedLists/{listId}<br/>(title, sections, ownerUid, sharedWith)
+        App->>FB: Write users/{ownerUid}/sharedListIds/{listId}: true
+        App->>FB: Write users/{targetUid}/sharedListIds/{listId}: true
+        App->>FB: Remove users/{ownerUid}/lists/{listId}
+        FB-->>App: Success
+    end
+
+    rect rgb(255, 243, 224)
+        Note over Owner, FB: Step 3 - Both users see the shared list
+        App->>FB: Read users/{ownerUid}/sharedListIds
+        FB-->>App: { listId: true }
+        App->>FB: Read sharedLists/{listId}
+        FB-->>App: Full list data (owner sees it in Shared section)
+        App->>FB: Read users/{targetUid}/sharedListIds
+        FB-->>App: { listId: true }
+        App->>FB: Read sharedLists/{listId}
+        FB-->>App: Full list data (recipient sees it in Shared section)
+    end
+
+    rect rgb(240, 230, 255)
+        Note over Owner, FB: Step 4 - Collaborative editing
+        Owner->>App: Edit an item
+        App->>FB: Write sharedLists/{listId}/sections/{sectionId}
+        FB-->>Recipient: Real-time update (same node)
+    end
+
+    rect rgb(255, 230, 230)
+        Note over Owner, FB: Step 5 - Owner deletes shared list
+        Owner->>App: Delete shared list
+        App->>FB: Write users/{ownerUid}/lists/{listId}<br/>(restore list to owner's private lists)
+        App->>FB: Remove sharedLists/{listId}
+        App->>FB: Remove users/{ownerUid}/sharedListIds/{listId}
+        App->>FB: Remove users/{targetUid}/sharedListIds/{listId}
+        FB-->>App: Success
+    end
+        </div>
+        <div class="diagram-caption">Figure 3: Sharing Flow Sequence</div>
+    </div>
+
+    <h2>4. Firebase Paths Reference</h2>
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Path</th>
+                    <th>Purpose</th>
+                    <th>Access</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>users/{uid}/lists/{listId}</code></td>
+                    <td>Private lists owned by the user</td>
+                    <td>Owner only</td>
+                </tr>
+                <tr>
+                    <td><code>users/{uid}/groups/{groupId}</code></td>
+                    <td>Item groups (templates for sections)</td>
+                    <td>Owner only</td>
+                </tr>
+                <tr>
+                    <td><code>users/{uid}/sharedListIds/{listId}</code></td>
+                    <td>References to shared lists</td>
+                    <td>Owner read/write; any auth user can write (to add share ref)</td>
+                </tr>
+                <tr>
+                    <td><code>sharedLists/{listId}</code></td>
+                    <td>Shared list data (title, sections, sharedWith)</td>
+                    <td>Owner + users in sharedWith</td>
+                </tr>
+                <tr>
+                    <td><code>userEmails/{sanitizedEmail}</code></td>
+                    <td>Email-to-UID lookup (dots replaced with commas)</td>
+                    <td>Any authenticated user can read; write own entry</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h2>5. Key Design Decisions</h2>
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Decision</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Copy list to <code>sharedLists/</code></td>
+                    <td>Firebase RTDB doesn't support per-node ACLs on nested paths. Top-level node enables security rules based on <code>ownerUid</code> and <code>sharedWith</code>.</td>
+                </tr>
+                <tr>
+                    <td>Store references at <code>sharedListIds/</code></td>
+                    <td>Avoids querying all of <code>sharedLists/</code> to find lists for a user. Each user has a lightweight index.</td>
+                </tr>
+                <tr>
+                    <td>Sanitize emails (dot to comma)</td>
+                    <td>Firebase keys cannot contain <code>.</code>, <code>#</code>, <code>$</code>, <code>[</code>, or <code>]</code>. Commas are allowed and reversible.</td>
+                </tr>
+                <tr>
+                    <td>Register email on every login</td>
+                    <td>Ensures the lookup table stays current even if a user changes their display name or re-authenticates.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose'
+        });
+
+        // Download helpers
+        function downloadDiagramAsSVG(diagramElement, filename) {
+            const svg = diagramElement.querySelector('svg');
+            if (!svg) { alert('Diagram not rendered yet.'); return; }
+            const svgClone = svg.cloneNode(true);
+            svgClone.style.backgroundColor = 'white';
+            const svgData = new XMLSerializer().serializeToString(svgClone);
+            const blob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename + '.svg';
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a); URL.revokeObjectURL(url);
+        }
+
+        function downloadDiagramAsPNG(diagramElement, filename) {
+            const svg = diagramElement.querySelector('svg');
+            if (!svg) { alert('Diagram not rendered yet.'); return; }
+            const rect = svg.getBoundingClientRect();
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const scale = 2;
+            canvas.width = rect.width * scale;
+            canvas.height = rect.height * scale;
+            ctx.scale(scale, scale);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, rect.width, rect.height);
+            const data = new XMLSerializer().serializeToString(svg);
+            const blob = new Blob([data], {type: 'image/svg+xml;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const img = new Image();
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, rect.width, rect.height);
+                canvas.toBlob(function(b) {
+                    const u = URL.createObjectURL(b);
+                    const a = document.createElement('a');
+                    a.href = u; a.download = filename + '.png';
+                    document.body.appendChild(a); a.click();
+                    document.body.removeChild(a); URL.revokeObjectURL(u);
+                }, 'image/png');
+                URL.revokeObjectURL(url);
+            };
+            img.src = url;
+        }
+
+        setTimeout(function() {
+            document.querySelectorAll('.mermaid').forEach(function(diagram, i) {
+                const caption = diagram.nextElementSibling;
+                if (caption && caption.classList.contains('diagram-caption')) {
+                    const match = caption.textContent.match(/Figure \d+/);
+                    const name = match ? match[0].replace(/\s+/g, '-') : 'Diagram-' + (i + 1);
+                    const div = document.createElement('div');
+                    div.className = 'diagram-download';
+                    const svgBtn = document.createElement('button');
+                    svgBtn.textContent = '\u2193 SVG';
+                    svgBtn.onclick = function() { downloadDiagramAsSVG(diagram, name); };
+                    const pngBtn = document.createElement('button');
+                    pngBtn.className = 'png-btn';
+                    pngBtn.textContent = '\u2193 PNG';
+                    pngBtn.onclick = function() { downloadDiagramAsPNG(diagram, name); };
+                    div.appendChild(svgBtn);
+                    div.appendChild(pngBtn);
+                    caption.appendChild(div);
+                }
+            });
+        }, 3000);
+    </script>
+</body>
+</html>
