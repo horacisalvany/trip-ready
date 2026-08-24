@@ -3,13 +3,15 @@ import { By } from '@angular/platform-browser';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule, MatTooltip } from '@angular/material/tooltip';
 import { CdkDropList, DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { ActivatedRoute } from '@angular/router';
 import { of, Subject } from 'rxjs';
-import { ListComponent } from './list.component';
+import { ListComponent, formatSharedWith } from './list.component';
 import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
 import { GroupService } from '../group/group.service';
+import { AuthService } from '../../services/auth.service';
 import { Group } from '../group/group';
 import { List } from '../lists/list';
 import { Section } from './section';
@@ -38,6 +40,7 @@ describe('ListComponent', () => {
   let fixture: ComponentFixture<ListComponent>;
   let mockListService: jasmine.SpyObj<ListService>;
   let mockGroupService: jasmine.SpyObj<GroupService>;
+  let mockAuthService: { user$: Subject<{ uid: string } | null> };
 
   beforeEach(async () => {
     mockListService = jasmine.createSpyObj('ListService', [
@@ -65,11 +68,14 @@ describe('ListComponent', () => {
       of(MOCK_GROUPS.map((g) => ({ ...g, items: [...g.items] })))
     );
 
+    mockAuthService = { user$: new Subject() };
+
     await TestBed.configureTestingModule({
-      imports: [ListComponent, MatDialogModule, MatListModule, MatIconModule, DragDropModule],
+      imports: [ListComponent, MatDialogModule, MatListModule, MatIconModule, MatTooltipModule, DragDropModule],
       providers: [
         { provide: ListService, useValue: mockListService },
         { provide: GroupService, useValue: mockGroupService },
+        { provide: AuthService, useValue: mockAuthService },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -82,6 +88,8 @@ describe('ListComponent', () => {
 
     fixture = TestBed.createComponent(ListComponent);
     component = fixture.componentInstance;
+    fixture.detectChanges();
+    mockAuthService.user$.next({ uid: 'ownerUid' });
     fixture.detectChanges();
   });
 
@@ -467,10 +475,11 @@ describe('ListComponent', () => {
 
     await TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
-      imports: [ListComponent, MatDialogModule, MatListModule, MatIconModule, DragDropModule],
+      imports: [ListComponent, MatDialogModule, MatListModule, MatIconModule, MatTooltipModule, DragDropModule],
       providers: [
         { provide: ListService, useValue: mockListService },
         { provide: GroupService, useValue: mockGroupService },
+        { provide: AuthService, useValue: { user$: of(null) } },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -485,5 +494,85 @@ describe('ListComponent', () => {
     f.detectChanges();
 
     expect(mockListService.getList).not.toHaveBeenCalled();
+  });
+
+  // --- formatSharedWith ---
+
+  describe('formatSharedWith', () => {
+    it('should format a single email', () => {
+      expect(formatSharedWith(['bob@test.com'])).toBe(
+        'Shared with: bob@test.com'
+      );
+    });
+
+    it('should format two emails joined by "and"', () => {
+      expect(formatSharedWith(['bob@test.com', 'ann@test.com'])).toBe(
+        'Shared with: bob@test.com and ann@test.com'
+      );
+    });
+
+    it('should format three or more emails with commas and "and" before the last', () => {
+      expect(
+        formatSharedWith(['bob@test.com', 'ann@test.com', 'marie@test.com'])
+      ).toBe('Shared with: bob@test.com, ann@test.com and marie@test.com');
+    });
+
+    it('should return an empty string when there are no emails', () => {
+      expect(formatSharedWith([])).toBe('');
+    });
+  });
+
+  // --- shared-with info tooltip ---
+
+  describe('shared-with info icon', () => {
+    function setList(list: List): void {
+      component.list = list;
+      fixture.detectChanges();
+    }
+
+    it('should not show the info icon for a private, unshared list', () => {
+      setList({ ...MOCK_LIST });
+
+      const infoIcon = fixture.debugElement.query(By.css('.shared-with-info'));
+      expect(infoIcon).toBeNull();
+    });
+
+    it('should show the info icon when the current user owns the shared list', () => {
+      setList({
+        ...MOCK_LIST,
+        isShared: true,
+        ownerUid: 'ownerUid',
+        sharedWith: { friendUid: 'friend@test.com' },
+      });
+
+      const infoIcon = fixture.debugElement.query(By.css('.shared-with-info'));
+      expect(infoIcon).toBeTruthy();
+      const tooltip = infoIcon.injector.get(MatTooltip);
+      expect(tooltip.message).toBe('Shared with: friend@test.com');
+    });
+
+    it('should not show the info icon when the current user is a recipient, not the owner', () => {
+      setList({
+        ...MOCK_LIST,
+        isShared: true,
+        ownerUid: 'someoneElseUid',
+        sharedWith: { ownerUid: 'owner@test.com' },
+      });
+
+      const infoIcon = fixture.debugElement.query(By.css('.shared-with-info'));
+      expect(infoIcon).toBeNull();
+    });
+
+    it('should not show the info icon when the shared list has no recipients yet', () => {
+      setList({
+        ...MOCK_LIST,
+        isShared: true,
+        ownerUid: 'ownerUid',
+        sharedWith: {},
+      });
+
+      const infoIcon = fixture.debugElement.query(By.css('.shared-with-info'));
+      expect(infoIcon).toBeNull();
+    });
   });
 });

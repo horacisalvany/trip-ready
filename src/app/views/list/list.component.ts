@@ -10,6 +10,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
 import { take } from 'rxjs/operators';
 import { MaterialModule } from 'src/app/material.module';
+import { AuthService } from '../../services/auth.service';
 import { Group } from '../group/group';
 import { GroupService } from '../group/group.service';
 import { List } from '../lists/list';
@@ -17,6 +18,14 @@ import { DialogAddGroupComponent } from './dialog-add-group/dialog-add-group.com
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
 import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
 import { DRAG_START_DELAY } from '../drag-config';
+
+export function formatSharedWith(emails: string[]): string {
+  if (emails.length === 0) return '';
+  if (emails.length === 1) return `Shared with: ${emails[0]}`;
+  const last = emails[emails.length - 1];
+  const rest = emails.slice(0, -1);
+  return `Shared with: ${rest.join(', ')} and ${last}`;
+}
 
 @Component({
   selector: 'list',
@@ -29,6 +38,7 @@ export class ListComponent implements OnInit {
   list: List | undefined;
   isShared = false;
   readonly dragStartDelay = DRAG_START_DELAY;
+  currentUserUid: string | null = null;
   /*
     Boolean to control that something has been dropped. Without there are bugs like missclicks after you drop a list on the trash
     and the popup of add a new list is opened for no reason.
@@ -39,10 +49,15 @@ export class ListComponent implements OnInit {
     private route: ActivatedRoute,
     public dialog: MatDialog,
     private listService: ListService,
-    private groupService: GroupService
+    private groupService: GroupService,
+    private authService: AuthService
   ) {}
 
   ngOnInit(): void {
+    this.authService.user$.subscribe((user) => {
+      this.currentUserUid = user?.uid ?? null;
+    });
+
     this.route.data.subscribe((data) => {
       this.isShared = !!data['shared'];
     });
@@ -58,6 +73,18 @@ export class ListComponent implements OnInit {
         });
       }
     });
+  }
+
+  get showSharedWithInfo(): boolean {
+    return (
+      !!this.list?.isShared &&
+      this.list.ownerUid === this.currentUserUid &&
+      Object.keys(this.list.sharedWith ?? {}).length > 0
+    );
+  }
+
+  get sharedWithTooltip(): string {
+    return formatSharedWith(Object.values(this.list?.sharedWith ?? {}));
   }
 
   openShareDialog(): void {
