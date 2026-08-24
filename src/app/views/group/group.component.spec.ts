@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
@@ -6,6 +7,7 @@ import { of } from 'rxjs';
 import { GroupComponent } from './group.component';
 import { GroupService } from './group.service';
 import { Group } from './group';
+import { expectAllDragsHaveStartDelay } from '../drag-config.spec-helper';
 
 const MOCK_GROUPS: Group[] = [
   { id: 'g1', title: 'Packing', items: ['Passport', 'Tickets'] },
@@ -312,5 +314,32 @@ describe('GroupComponent', () => {
 
     expect(mockDialog.open).toHaveBeenCalled();
     expect(mockGroupService.addGroup).not.toHaveBeenCalled();
+  });
+
+  // --- touch drag delay (mobile scrolling) ---
+
+  it('should apply the shared touch drag delay to every draggable', () => {
+    // 2 group cards + 4 items (2 in Packing + 2 in Documents)
+    expectAllDragsHaveStartDelay(fixture, 6);
+  });
+
+  it('should suppress text selection on every draggable so a long press does not select text', () => {
+    // 2 group cards + 4 items (2 in Packing + 2 in Documents)
+    const dragElements = fixture.debugElement.queryAll(By.css('.cdk-drag'));
+    expect(dragElements.length).toBe(6);
+
+    dragElements.forEach((el, i) =>
+      expect(getComputedStyle(el.nativeElement).userSelect)
+        .withContext(`.cdk-drag #${i} — rule lives in src/styles.scss, class is CDK's DRAG_HOST_CLASS`)
+        .toBe('none')
+    );
+  });
+
+  it('should keep text editing enabled on inputs inside a draggable', () => {
+    const input = fixture.debugElement.query(By.css('.cdk-drag input'));
+    expect(input).toBeTruthy();
+    expect(getComputedStyle(input.nativeElement).userSelect)
+      .withContext('rule lives in src/styles.scss')
+      .toBe('text');
   });
 });

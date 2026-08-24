@@ -15,6 +15,7 @@ import { AuthService } from '../../services/auth.service';
 import { Group } from '../group/group';
 import { List } from '../lists/list';
 import { Section } from './section';
+import { expectAllDragsHaveStartDelay } from '../drag-config.spec-helper';
 
 const MOCK_SECTIONS: Section[] = [
   { id: 'ungrouped', title: UNGROUPED_SECTION_TITLE, items: [] },
@@ -156,10 +157,9 @@ describe('ListComponent', () => {
     expect(dropList!.id).toBe('trash-list');
   });
 
-  it('should render sections and items as cdkDrag elements', () => {
+  it('should apply the shared touch drag delay to every draggable', () => {
     // 3 sections + 4 items (2 in Packing + 2 in Electronics)
-    const dragElements = fixture.debugElement.queryAll(By.css('[cdkDrag]'));
-    expect(dragElements.length).toBe(7);
+    expectAllDragsHaveStartDelay(fixture, 7);
   });
 
   // --- ungrouped section ---

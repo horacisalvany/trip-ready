@@ -10,6 +10,7 @@ import { ListService } from '../list/list.service';
 import { ShareService } from '../../services/share.service';
 import { DialogAddListComponent } from './dialog-add-list/dialog-add-list.component';
 import { List } from './list';
+import { DRAG_START_DELAY } from '../drag-config';
 
 @Component({
   selector: 'lists',
@@ -22,6 +23,7 @@ export class ListsComponent implements OnInit {
   lists: List[] = [];
   sharedLists: List[] = [];
   currentUserUid: string | null = null;
+  readonly dragStartDelay = DRAG_START_DELAY;
 
   constructor(
     private router: Router,

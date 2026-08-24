@@ -17,6 +17,7 @@ import { List } from '../lists/list';
 import { DialogAddGroupComponent } from './dialog-add-group/dialog-add-group.component';
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
 import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
+import { DRAG_START_DELAY } from '../drag-config';
 
 export function formatSharedWith(emails: string[]): string {
   if (emails.length === 0) return '';
@@ -36,6 +37,7 @@ export function formatSharedWith(emails: string[]): string {
 export class ListComponent implements OnInit {
   list: List | undefined;
   isShared = false;
+  readonly dragStartDelay = DRAG_START_DELAY;
   currentUserUid: string | null = null;
   /*
     Boolean to control that something has been dropped. Without there are bugs like missclicks after you drop a list on the trash

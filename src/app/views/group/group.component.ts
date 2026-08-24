@@ -9,6 +9,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { Group } from './group';
 import { GroupService } from './group.service';
 import { DialogCreateGroupComponent } from './dialog-add-group/dialog-add-group.component';
+import { DRAG_START_DELAY } from '../drag-config';
 
 @Component({
   selector: 'group',
@@ -17,6 +18,7 @@ import { DialogCreateGroupComponent } from './dialog-add-group/dialog-add-group.
 })
 export class GroupComponent implements OnInit {
   groups: Group[] = [];
+  readonly dragStartDelay = DRAG_START_DELAY;
   /*
     Boolean to control that something has been dropped. Without there are bugs like missclicks after you drop a list on the trash
     and the popup of add a new list is opened for no reason.

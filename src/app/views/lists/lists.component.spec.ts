@@ -12,10 +12,22 @@ import { AuthService } from '../../services/auth.service';
 import { ListService } from '../list/list.service';
 import { ShareService } from '../../services/share.service';
 import { List } from './list';
+import { expectAllDragsHaveStartDelay } from '../drag-config.spec-helper';
 
 const MOCK_LISTS: List[] = [
   { id: 'l1', title: 'Paris Trip', sections: [] },
   { id: 'l2', title: 'Weekend Getaway', sections: [] },
+];
+
+const MOCK_SHARED_LISTS: List[] = [
+  {
+    id: 's1',
+    title: 'Shared Trip',
+    sections: [],
+    isShared: true,
+    ownerUid: 'otherUid',
+    ownerEmail: 'other@test.com',
+  },
 ];
 
 describe('ListsComponent', () => {
@@ -250,5 +262,16 @@ describe('ListsComponent', () => {
 
     expect(mockListService.deleteList).not.toHaveBeenCalled();
     expect(mockShareService.deleteSharedList).not.toHaveBeenCalled();
+  });
+
+  // --- touch drag delay (mobile scrolling) ---
+
+  it('should apply the shared touch drag delay to every draggable', () => {
+    mockShareService.getSharedLists.and.returnValue(of(MOCK_SHARED_LISTS));
+    component.ngOnInit();
+    fixture.detectChanges();
+
+    // 2 private lists from MOCK_LISTS + 1 shared list
+    expectAllDragsHaveStartDelay(fixture, 3);
   });
 });

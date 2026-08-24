@@ -42,6 +42,20 @@ Lists are travel checklists. Each list has one or more sections.
 
 ---
 
+## Interaction
+
+Drag-and-drop is the primary way to move and delete things, and on a phone almost every
+touchable pixel belongs to a draggable element. To keep those screens scrollable:
+
+- On touch devices, a drag starts on **press-and-hold** (about a quarter of a second). A
+  quick swipe scrolls the page and never picks anything up.
+- On pointer devices, a drag starts immediately on press-and-move.
+- This applies to every draggable: items, group cards, list sections, and list cards.
+- Text inside a draggable is not selectable, so a long press starts a drag instead of
+  selecting text. Text fields are exempt — they keep normal editing, including paste.
+
+---
+
 ## Shared Lists
 
 Sharing turns a private list into a collaborative document with a single source of truth.
