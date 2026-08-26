@@ -58,10 +58,25 @@ This runs `yarn build:prod` (Angular production build into `dist/tripReady`) fol
 
 The first `npx firebase-tools@13 ...` invocation on a machine downloads the CLI package tree, which can take a few minutes. Subsequent deploys are faster since it's cached by `npx`.
 
+## Deploying the database rules
+
+The Realtime Database security rules live in [`database.rules.json`](../database.rules.json) and deploy separately from hosting:
+
+```bash
+yarn deploy:rules
+```
+
+**The repo is the source of truth — do not edit the rules in the Firebase Console.** A console edit is invisible to git, so the next `yarn deploy:rules` silently overwrites it, and in the meantime the committed file no longer describes what's actually enforced.
+
+This matters because the rules decide which paths the app is allowed to read. When client code changes which paths it touches (as in PR #21), the rules are the other half of that change, and a reviewer can only check the two against each other if both are in the diff.
+
+> **Note:** `yarn deploy:rules` needs a working `firebase login`, which is currently blocked on the corporate network (see above). Until that's resolved, the committed file is the reviewable record of the rules but has to be applied from an unblocked machine or with a `--token`.
+
 ## How it's configured
 
-- **`firebase.json`** — sets `dist/tripReady` (Angular's build output) as the public directory, and rewrites all routes to `/index.html` so Angular's client-side router handles navigation (deep links, page refresh) correctly.
+- **`firebase.json`** — sets `dist/tripReady` (Angular's build output) as the public directory, and rewrites all routes to `/index.html` so Angular's client-side router handles navigation (deep links, page refresh) correctly. Also points `database.rules` at `database.rules.json`.
 - **`.firebaserc`** — pins the default Firebase project to `ready4trip-5d3f6`, so `firebase deploy` doesn't prompt you to pick a project.
+- **`database.rules.json`** — the Realtime Database security rules, committed verbatim from the console as the starting baseline.
 
 ## Verifying a deploy
 

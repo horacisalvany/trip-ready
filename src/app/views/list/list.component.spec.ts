@@ -575,4 +575,48 @@ describe('ListComponent', () => {
       expect(infoIcon).toBeNull();
     });
   });
+
+  // --- share button visibility (owner-only sharing) ---
+
+  describe('share button', () => {
+    function setList(list: List): void {
+      component.list = list;
+      fixture.detectChanges();
+    }
+
+    function shareButton() {
+      return fixture.debugElement.query(By.css('.share-list'));
+    }
+
+    it('should show the share button for a private list', () => {
+      setList({ ...MOCK_LIST });
+
+      expect(component.canShare).toBeTrue();
+      expect(shareButton()).toBeTruthy();
+    });
+
+    it('should show the share button when the current user owns the shared list', () => {
+      setList({
+        ...MOCK_LIST,
+        isShared: true,
+        ownerUid: 'ownerUid',
+        sharedWith: { friendUid: 'friend@test.com' },
+      });
+
+      expect(component.canShare).toBeTrue();
+      expect(shareButton()).toBeTruthy();
+    });
+
+    it('should hide the share button from a recipient of a shared list', () => {
+      setList({
+        ...MOCK_LIST,
+        isShared: true,
+        ownerUid: 'someoneElseUid',
+        sharedWith: { ownerUid: 'owner@test.com' },
+      });
+
+      expect(component.canShare).toBeFalse();
+      expect(shareButton()).toBeNull();
+    });
+  });
 });

@@ -87,6 +87,14 @@ export class ListComponent implements OnInit {
     return formatSharedWith(Object.values(this.list?.sharedWith ?? {}));
   }
 
+  /*
+    Only the owner may share. A private list has no owner recorded yet, so its
+    creator is free to share it; once shared, recipients lose the button.
+  */
+  get canShare(): boolean {
+    return !this.list?.isShared || this.list.ownerUid === this.currentUserUid;
+  }
+
   openShareDialog(): void {
     if (!this.list) return;
     this.dialog.open(DialogShareListComponent, {

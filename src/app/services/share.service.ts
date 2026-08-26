@@ -1,10 +1,17 @@
 import { Injectable } from '@angular/core';
 import { AngularFireDatabase } from '@angular/fire/compat/database';
-import { Observable, forkJoin, from, of } from 'rxjs';
+import { Observable, forkJoin, from, of, throwError } from 'rxjs';
 import { map, switchMap, take } from 'rxjs/operators';
 import { List } from '../views/lists/list';
 import { Section } from '../views/list/section';
 import { AuthService } from './auth.service';
+
+/*
+  Thrown by shareList() when someone other than the owner tries to add a recipient
+  to an already-shared list. The UI hides the share button from recipients, so this
+  is a second line of defence rather than the expected path.
+*/
+export const NOT_LIST_OWNER_ERROR = 'not-list-owner';
 
 @Injectable({
   providedIn: 'root',
@@ -45,32 +52,64 @@ export class ShareService {
       take(1),
       switchMap((user) => {
         if (!user) return of(undefined as void);
-        const ownerUid = user.uid;
-        const ownerEmail = user.email ?? '';
+        const callerUid = user.uid;
+        const callerEmail = user.email ?? '';
 
-        // 1. Check whether the list is already shared
+        // 1. Check whether the list is already shared.
+        //    Probe the caller's own sharedListIds rather than sharedLists/{listId}:
+        //    the security rules only grant read on a shared list to its owner and
+        //    recipients, which is decided from the node's own data. For a list that
+        //    is not shared yet the node does not exist, so there is nothing to match
+        //    and the read is denied. The sharedListIds entry is written whenever a
+        //    list becomes shared, so it is an equivalent signal that always lives
+        //    inside the caller's own readable subtree.
         return this.db
-          .object(`sharedLists/${listId}`)
+          .object(`users/${callerUid}/sharedListIds/${listId}`)
           .valueChanges()
           .pipe(
             take(1),
-            switchMap((existingSharedListData: any) => {
-              if (existingSharedListData) {
-                // Already shared: merge the new recipient into sharedWith
-                // instead of overwriting the whole node (would drop other recipients)
-                return forkJoin([
-                  from(
-                    this.db
-                      .object(`sharedLists/${listId}/sharedWith/${targetUid}`)
-                      .set(targetEmail)
-                  ),
-                  from(this.db.object(`users/${targetUid}/sharedListIds/${listId}`).set(true)),
-                ]).pipe(map(() => undefined as void));
+            switchMap((alreadyShared: any) => {
+              if (alreadyShared) {
+                // 2a. Already shared. The caller is a participant, so reading the
+                //     node is permitted from here on — but only the owner is
+                //     allowed to add further recipients.
+                return this.db
+                  .object<string>(`sharedLists/${listId}/ownerUid`)
+                  .valueChanges()
+                  .pipe(
+                    take(1),
+                    switchMap((listOwnerUid) => {
+                      if (listOwnerUid !== callerUid) {
+                        return throwError(
+                          () => new Error(NOT_LIST_OWNER_ERROR)
+                        );
+                      }
+
+                      // Merge the new recipient into sharedWith instead of
+                      // overwriting the whole node, which would drop the
+                      // recipients already there.
+                      return forkJoin([
+                        from(
+                          this.db
+                            .object(
+                              `sharedLists/${listId}/sharedWith/${targetUid}`
+                            )
+                            .set(targetEmail)
+                        ),
+                        from(
+                          this.db
+                            .object(`users/${targetUid}/sharedListIds/${listId}`)
+                            .set(true)
+                        ),
+                      ]).pipe(map(() => undefined as void));
+                    })
+                  );
               }
 
-              // 2. Not yet shared: read the current private list data
+              // 2b. Not yet shared: read the caller's private list data. Only the
+              //     owner has a private copy, so this path is owner-only already.
               return this.db
-                .object(`users/${ownerUid}/lists/${listId}`)
+                .object(`users/${callerUid}/lists/${listId}`)
                 .valueChanges()
                 .pipe(
                   take(1),
@@ -81,8 +120,8 @@ export class ShareService {
                     const sharedListData = {
                       title: listData.title,
                       sections: listData.sections ?? {},
-                      ownerUid,
-                      ownerEmail,
+                      ownerUid: callerUid,
+                      ownerEmail: callerEmail,
                       sharedWith: { [targetUid]: targetEmail },
                     };
 
@@ -90,9 +129,9 @@ export class ShareService {
                     //    register for both owner and target, remove from owner's personal lists
                     return forkJoin([
                       from(this.db.object(`sharedLists/${listId}`).set(sharedListData)),
-                      from(this.db.object(`users/${ownerUid}/sharedListIds/${listId}`).set(true)),
+                      from(this.db.object(`users/${callerUid}/sharedListIds/${listId}`).set(true)),
                       from(this.db.object(`users/${targetUid}/sharedListIds/${listId}`).set(true)),
-                      from(this.db.object(`users/${ownerUid}/lists/${listId}`).remove()),
+                      from(this.db.object(`users/${callerUid}/lists/${listId}`).remove()),
                     ]).pipe(map(() => undefined as void));
                   })
                 );

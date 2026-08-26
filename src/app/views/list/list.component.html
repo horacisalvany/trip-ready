@@ -14,7 +14,13 @@
       [matTooltip]="sharedWithTooltip"
       >info</mat-icon
     >
-    <button (click)="openShareDialog()" mat-icon-button title="Share list">
+    <button
+      *ngIf="canShare"
+      (click)="openShareDialog()"
+      class="share-list"
+      mat-icon-button
+      title="Share list"
+    >
       <mat-icon>share</mat-icon>
     </button>
     <button (click)="openDialogAddGroup()" mat-icon-button>

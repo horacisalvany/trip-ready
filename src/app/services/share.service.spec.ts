@@ -1,6 +1,6 @@
 import { AngularFireDatabase } from '@angular/fire/compat/database';
 import { of } from 'rxjs';
-import { ShareService } from './share.service';
+import { NOT_LIST_OWNER_ERROR, ShareService } from './share.service';
 import { AuthService } from './auth.service';
 
 describe('ShareService', () => {
@@ -98,17 +98,14 @@ describe('ShareService', () => {
       });
     });
 
-    it('should merge the new recipient into sharedWith instead of overwriting the whole node when the list is already shared', (done) => {
-      const existingSharedListData = {
-        title: 'Beach Trip',
-        sections: {
-          s1: { title: 'Essentials', items: ['sunscreen'] },
-        },
-        ownerUid: 'ownerUid',
-        ownerEmail: 'owner@test.com',
-        sharedWith: { friendUid: 'friend@test.com' },
-      };
-
+    /*
+      Records one AngularFireObject spy per path so a test can assert which paths
+      were touched at all, and how. The accessors return plain values rather than
+      the spies themselves so an unexpectedly untouched path fails the expectation
+      instead of throwing "Expected a spy, but got undefined" inside the subscribe
+      callback, which would swallow done() and hang the runner.
+    */
+    function stubObjectsByPath(valueFor: (path: string) => unknown) {
       const objectsByPath = new Map<string, jasmine.SpyObj<any>>();
 
       mockDb.object.and.callFake((path: string) => {
@@ -120,28 +117,91 @@ describe('ShareService', () => {
           ]);
           obj.set.and.returnValue(Promise.resolve());
           obj.remove.and.returnValue(Promise.resolve());
-          obj.valueChanges.and.returnValue(
-            path === 'sharedLists/list1' ? of(existingSharedListData) : of(null)
-          );
+          obj.valueChanges.and.returnValue(of(valueFor(path)));
           objectsByPath.set(path, obj);
         }
         return objectsByPath.get(path);
       });
 
+      return {
+        touched: (path: string) => objectsByPath.has(path),
+        setArgs: (path: string) =>
+          objectsByPath.get(path)?.set.calls.allArgs() ?? [],
+        readCount: (path: string) =>
+          objectsByPath.get(path)?.valueChanges.calls.count() ?? 0,
+      };
+    }
+
+    it('should merge the new recipient into sharedWith instead of overwriting the whole node when the list is already shared', (done) => {
+      const db = stubObjectsByPath((path) => {
+        if (path === 'users/ownerUid/sharedListIds/list1') return true;
+        if (path === 'sharedLists/list1/ownerUid') return 'ownerUid';
+        return null;
+      });
+
       service.shareList('list1', 'newTargetUid', 'new@test.com').subscribe({
         next: () => {
           expect(
-            objectsByPath.get('sharedLists/list1')?.set
-          ).not.toHaveBeenCalled();
-          expect(
-            objectsByPath.get('sharedLists/list1/sharedWith/newTargetUid')?.set
-          ).toHaveBeenCalledWith('new@test.com');
-          expect(
-            objectsByPath.get('users/newTargetUid/sharedListIds/list1')?.set
-          ).toHaveBeenCalledWith(true);
+            db.setArgs('sharedLists/list1/sharedWith/newTargetUid')
+          ).toEqual([['new@test.com']]);
+          expect(db.setArgs('users/newTargetUid/sharedListIds/list1')).toEqual([
+            [true],
+          ]);
+          // Rewriting the whole node would drop the recipients already in
+          // sharedWith, so it must not be touched at all.
+          expect(db.touched('sharedLists/list1')).toBeFalse();
+          // The owner's private copy was removed on the first share; the merge
+          // path must not read or restore it.
+          expect(db.touched('users/ownerUid/lists/list1')).toBeFalse();
           done();
         },
         error: done.fail,
+      });
+    });
+
+    it('should decide from the owner sharedListIds without reading sharedLists/{listId}', (done) => {
+      // Regression: this decision used to be made by reading sharedLists/{listId}.
+      // For a list that is not shared yet that node does not exist, so the
+      // security rules reject the read with permission_denied and the whole
+      // share flow dies before writing anything.
+      const db = stubObjectsByPath((path) =>
+        path === 'users/ownerUid/lists/list1'
+          ? { title: 'Vacation', sections: {} }
+          : null
+      );
+
+      service.shareList('list1', 'targetUid', 'target@test.com').subscribe({
+        next: () => {
+          expect(db.readCount('users/ownerUid/sharedListIds/list1')).toBe(1);
+          expect(db.readCount('sharedLists/list1')).toBe(0);
+          expect(db.setArgs('sharedLists/list1').length).toBe(1);
+          done();
+        },
+        error: done.fail,
+      });
+    });
+
+    it('should refuse to add a recipient when the caller does not own the already-shared list', (done) => {
+      // The caller is a recipient: they have a sharedListIds entry, but the list
+      // belongs to someone else, so they must not be able to invite anyone.
+      const db = stubObjectsByPath((path) => {
+        if (path === 'users/ownerUid/sharedListIds/list1') return true;
+        if (path === 'sharedLists/list1/ownerUid') return 'someoneElseUid';
+        return null;
+      });
+
+      service.shareList('list1', 'newTargetUid', 'new@test.com').subscribe({
+        next: () => done.fail('expected shareList to error'),
+        error: (err: Error) => {
+          expect(err.message).toBe(NOT_LIST_OWNER_ERROR);
+          expect(
+            db.setArgs('sharedLists/list1/sharedWith/newTargetUid')
+          ).toEqual([]);
+          expect(db.setArgs('users/newTargetUid/sharedListIds/list1')).toEqual(
+            []
+          );
+          done();
+        },
       });
     });
   });

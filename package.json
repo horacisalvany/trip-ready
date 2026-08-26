@@ -10,7 +10,8 @@
     "build:components": "yarn install && ng build",
     "build:prod": "ng build --configuration production",
     "test:prod": "ng test --browsers=ChromeHeadless --watch=false --code-coverage",
-    "deploy": "yarn build:prod && npx firebase-tools@13 deploy --only hosting"
+    "deploy": "yarn build:prod && npx firebase-tools@13 deploy --only hosting",
+    "deploy:rules": "npx firebase-tools@13 deploy --only database"
   },
   "private": true,
   "dependencies": {
