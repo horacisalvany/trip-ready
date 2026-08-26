@@ -1,0 +1,29 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid",
+        "sharedListIds": {
+          "$listId": {
+            ".write": "auth != null"
+          }
+        }
+      }
+    },
+    "userEmails": {
+      ".read": "auth != null",
+      "$email": {
+        ".write": "auth != null"
+      }
+    },
+    "sharedLists": {
+      "$listId": {
+        ".read": "auth != null && (data.child('ownerUid').val() === auth.uid || data.child('sharedWith').child(auth.uid).exists())",
+        ".write": "auth != null && (data.child('ownerUid').val() === auth.uid || data.child('sharedWith').child(auth.uid).exists() || !data.exists())"
+      }
+    },
+    ".read": false,
+    ".write": false
+  }
+}
