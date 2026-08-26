@@ -8,7 +8,10 @@ import {
 } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MaterialModule } from 'src/app/material.module';
-import { ShareService } from 'src/app/services/share.service';
+import {
+  NOT_LIST_OWNER_ERROR,
+  ShareService,
+} from 'src/app/services/share.service';
 
 @Component({
   selector: 'dialog-share-list',
@@ -38,22 +41,38 @@ export class DialogShareListComponent {
     this.loading = true;
     this.errorMessage = '';
 
-    this.shareService.lookupUserByEmail(this.email).subscribe((uid) => {
-      if (!uid) {
-        this.errorMessage =
-          'User not found. They must have logged in at least once.';
-        this.loading = false;
-        return;
-      }
+    this.shareService.lookupUserByEmail(this.email).subscribe({
+      next: (uid) => {
+        if (!uid) {
+          this.errorMessage =
+            'User not found. They must have logged in at least once.';
+          this.loading = false;
+          return;
+        }
 
-      this.shareService
-        .shareList(this.data.listId, uid, this.email)
-        .subscribe(() => {
-          this.snackBar.open(`List shared with ${this.email}`, 'OK', {
-            duration: 3000,
-          });
-          this.dialogRef.close(true);
+        this.shareService.shareList(this.data.listId, uid, this.email).subscribe({
+          next: () => {
+            this.snackBar.open(`List shared with ${this.email}`, 'OK', {
+              duration: 3000,
+            });
+            this.dialogRef.close(true);
+          },
+          // Without this the dialog keeps spinning forever on failure and the
+          // user gets no feedback at all.
+          error: (err: Error) => {
+            this.errorMessage =
+              err?.message === NOT_LIST_OWNER_ERROR
+                ? 'Only the list owner can share this list.'
+                : 'Could not share the list. Please try again.';
+            this.loading = false;
+          },
         });
+      },
+      error: () => {
+        this.errorMessage =
+          'Could not look up that email address. Please try again.';
+        this.loading = false;
+      },
     });
   }
 

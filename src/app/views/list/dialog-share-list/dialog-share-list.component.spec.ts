@@ -3,8 +3,11 @@ import { FormsModule } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
-import { ShareService } from 'src/app/services/share.service';
+import { of, throwError } from 'rxjs';
+import {
+  NOT_LIST_OWNER_ERROR,
+  ShareService,
+} from 'src/app/services/share.service';
 import { DialogShareListComponent } from './dialog-share-list.component';
 
 describe('DialogShareListComponent', () => {
@@ -93,5 +96,54 @@ describe('DialogShareListComponent', () => {
       { duration: 3000 }
     );
     expect(mockDialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('should stop loading and show an error when sharing fails', () => {
+    mockShareService.lookupUserByEmail.and.returnValue(of('target-uid'));
+    mockShareService.shareList.and.returnValue(
+      throwError(() => new Error('permission_denied'))
+    );
+    component.email = 'friend@example.com';
+
+    component.onShare();
+
+    expect(component.errorMessage).toBe(
+      'Could not share the list. Please try again.'
+    );
+    expect(component.loading).toBeFalse();
+    expect(mockDialogRef.close).not.toHaveBeenCalled();
+    expect(mockSnackBar.open).not.toHaveBeenCalled();
+  });
+
+  it('should show an ownership error when the caller does not own the list', () => {
+    mockShareService.lookupUserByEmail.and.returnValue(of('target-uid'));
+    mockShareService.shareList.and.returnValue(
+      throwError(() => new Error(NOT_LIST_OWNER_ERROR))
+    );
+    component.email = 'friend@example.com';
+
+    component.onShare();
+
+    expect(component.errorMessage).toBe(
+      'Only the list owner can share this list.'
+    );
+    expect(component.loading).toBeFalse();
+    expect(mockDialogRef.close).not.toHaveBeenCalled();
+  });
+
+  it('should stop loading and show an error when the email lookup fails', () => {
+    mockShareService.lookupUserByEmail.and.returnValue(
+      throwError(() => new Error('permission_denied'))
+    );
+    component.email = 'friend@example.com';
+
+    component.onShare();
+
+    expect(component.errorMessage).toBe(
+      'Could not look up that email address. Please try again.'
+    );
+    expect(component.loading).toBeFalse();
+    expect(mockShareService.shareList).not.toHaveBeenCalled();
+    expect(mockDialogRef.close).not.toHaveBeenCalled();
   });
 });

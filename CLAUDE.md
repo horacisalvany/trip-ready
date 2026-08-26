@@ -79,6 +79,32 @@ someWriteMethod(): Observable<void> {
 
 This was discovered as a real bug: lists and groups created by one user were being cloned into other users' accounts on login.
 
+## Critical Pattern: never read a node to check whether you may use it
+
+Security rules on `sharedLists/{id}` grant read access from the node's **own** data (`ownerUid`, `sharedWith`). A node that does not exist has no data to match against, so the read is **denied, not empty**:
+
+```ts
+// WRONG — denied when the list is not shared yet, killing the whole chain
+this.db.object(`sharedLists/${listId}`).valueChanges().pipe(
+  take(1),
+  switchMap((existing) => existing ? mergePath() : createPath())
+)
+
+// CORRECT — decide from a path inside the caller's own subtree
+this.db.object(`users/${callerUid}/sharedListIds/${listId}`).valueChanges().pipe(
+  take(1),
+  switchMap((alreadyShared) => alreadyShared ? mergePath() : createPath())
+)
+```
+
+**Rule of thumb:**
+- To test whether something exists → read a path the caller already owns
+- Read `sharedLists/{id}` only once access is established (the caller has a `sharedListIds` entry for it)
+
+A denied read surfaces as `permission_denied at /path: Client doesn't have permission to access the desired data.` and errors the whole observable, so every write downstream is skipped. Note that unit tests will **not** catch this: mocking `valueChanges()` as `of(null)` simulates *absent*, not *denied*.
+
+This was discovered as a real bug: sharing a list stopped working entirely because the "is it already shared?" check probed `sharedLists/{id}` before the sharer had any access to it.
+
 ## Development Notes
 
 - Uses SCSS for styling with a custom theme in `src/theme.scss`

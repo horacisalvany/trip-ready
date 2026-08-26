@@ -62,14 +62,28 @@ Sharing turns a private list into a collaborative document with a single source 
 
 ### Sharing a list
 
-- Only the list owner can share a list.
+- Only the list owner can share a list. Recipients cannot add further recipients, and the share button is hidden from them.
 - The owner shares a list by entering another registered user's email address.
 - The target user must have logged in at least once (so their email is in the lookup table).
-- On share:
-  - The list is published to a shared node (`sharedLists/{id}`) that both users read from.
+- A list can be shared with any number of recipients, added one at a time.
+- **First share** — the list becomes collaborative:
+  - The list is published to a shared node (`sharedLists/{id}`) that all participants read from.
   - The list is removed from the owner's private lists.
   - Both the owner and the recipient get a reference in their `sharedListIds`.
-- The shared list appears in the **Shared** section of the lists overview for both the owner and the recipient.
+- **Subsequent shares** — the list is already collaborative:
+  - The new recipient is added to `sharedWith`; existing recipients are preserved.
+  - The new recipient gets a reference in their `sharedListIds`.
+  - The list content is not republished, and ownership is unchanged.
+- Sharing with someone who is already a recipient succeeds and changes nothing.
+- The shared list appears in the **Shared** section of the lists overview for the owner and every recipient.
+- The owner sees an info icon next to the list title naming who the list is shared with.
+
+### When sharing fails
+
+- Unregistered email: the dialog shows "User not found. They must have logged in at least once." and stays open.
+- Non-owner attempting to share an already-shared list: the dialog shows "Only the list owner can share this list." and nothing is written.
+- Lookup or write failure: the dialog shows an error, stops its spinner, and stays open so the owner can retry. Nothing is written.
+- The dialog never closes, and never spins indefinitely, on failure.
 
 ### Collaborative editing
 
