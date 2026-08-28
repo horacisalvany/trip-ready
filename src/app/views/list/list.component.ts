@@ -187,8 +187,6 @@ export class ListComponent implements OnInit {
     }
   }
 
-  noEnterPredicate = () => false;
-
   getItemConnectedIds(sectionId: string): string[] {
     if (!this.list) return ['trash-list'];
     const otherIds = this.list.sections

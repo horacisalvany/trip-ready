@@ -27,7 +27,20 @@
       <mat-icon>add</mat-icon>
     </button>
   </div>
-  <div class="row">
+  <!--
+    The sections live inside their own drop list: a cdkDrag can only be dropped
+    on a list its container is connected to, and CdkDrag resolves that container
+    with @SkipSelf() — a cdkDropList on the section element itself is ignored.
+    Sorting is off because section order is not reorderable, so the cards stay
+    put while one of them is dragged to the trash.
+  -->
+  <div
+    class="row"
+    cdkDropList
+    id="section-cards"
+    [cdkDropListConnectedTo]="['trash-list']"
+    [cdkDropListSortingDisabled]="true"
+  >
     <div
       *ngFor="let section of list?.sections; let i = index"
       class="col-6 col-md-4"
@@ -35,9 +48,6 @@
       [cdkDragData]="{ type: 'section', id: section.id }"
       [cdkDragStartDelay]="dragStartDelay"
       [cdkDragDisabled]="isUngroupedSection(section.title)"
-      cdkDropList
-      [cdkDropListConnectedTo]="['trash-list']"
-      [cdkDropListEnterPredicate]="noEnterPredicate"
     >
       <div class="section-header" [class.no-drag]="isUngroupedSection(section.title)" cdkDragHandle>
         <mat-icon *ngIf="!isUngroupedSection(section.title)" class="drag-handle">drag_indicator</mat-icon>
