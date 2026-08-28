@@ -4,7 +4,7 @@ import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dial
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule, MatTooltip } from '@angular/material/tooltip';
-import { CdkDropList, DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
+import { CdkDrag, CdkDropList, DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { ActivatedRoute } from '@angular/router';
 import { of, Subject } from 'rxjs';
 import { ListComponent, formatSharedWith } from './list.component';
@@ -160,6 +160,121 @@ describe('ListComponent', () => {
   it('should apply the shared touch drag delay to every draggable', () => {
     // 3 sections + 4 items (2 in Packing + 2 in Electronics)
     expectAllDragsHaveStartDelay(fixture, 7);
+  });
+
+  /*
+    A cdkDrag only emits (cdkDropListDropped) if it lives inside a cdkDropList
+    that is connected to the target list. CdkDrag resolves that container with
+    @SkipSelf(), so a cdkDropList on the drag's own element never counts.
+    Without an enclosing drop list a section is a free-floating drag: it stays
+    wherever it is released and the trash handler is never called.
+   */
+  function connectedIds(dropList: CdkDropList): string[] {
+    const connected = dropList.connectedTo;
+    const asArray = Array.isArray(connected) ? connected : [connected];
+    return asArray.map((entry) => (typeof entry === 'string' ? entry : entry.id));
+  }
+
+  it('should place each section drag in a drop list connected to the trash', () => {
+    const sectionDrags = fixture.debugElement
+      .queryAll(By.directive(CdkDrag))
+      .map((el) => el.injector.get(CdkDrag))
+      .filter((drag) => drag.data?.type === 'section');
+
+    expect(sectionDrags.length).toBe(3);
+
+    sectionDrags.forEach((drag) => {
+      expect(drag.dropContainer)
+        .withContext(`section ${drag.data.id} is not inside any cdkDropList`)
+        .toBeTruthy();
+      expect(connectedIds(drag.dropContainer))
+        .withContext(`the drop list holding section ${drag.data.id}`)
+        .toContain('trash-list');
+    });
+  });
+
+  /*
+    End-to-end check of the same wiring through real pointer events: the drop
+    handler is only reached if the browser-level drag actually lands on the
+    trash. A section without an enclosing drop list floats free instead and
+    nothing is deleted.
+   */
+  describe('dragging a section onto the trash', () => {
+    function center(el: Element): { x: number; y: number } {
+      const rect = el.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    }
+
+    /*
+      CDK ignores a mousedown with `buttons: 0`, treating it as the synthetic
+      event a screen reader fires on enter/space.
+     */
+    function dispatchMouse(target: EventTarget, type: string, x: number, y: number): void {
+      target.dispatchEvent(
+        new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+          screenX: x,
+          screenY: y,
+          button: 0,
+          buttons: 1,
+          detail: 1,
+        })
+      );
+    }
+
+    async function dragSectionToTrash(sectionTitle: string): Promise<void> {
+      const handle = fixture.debugElement
+        .queryAll(By.css('.section-header'))
+        .find((el) => el.nativeElement.textContent.includes(sectionTitle))!.nativeElement;
+      const trash: HTMLElement = fixture.nativeElement.querySelector('.trash-icon');
+      /*
+        The karma viewport is narrow enough that a section card can overlap the
+        floating trash. CDK only accepts a drop when elementFromPoint at the
+        cursor resolves to the target list, so lift the trash above both the
+        cards and CDK's own preview (z-index 1000) to keep the test about the
+        drop wiring rather than about the test window's size.
+       */
+      trash.style.zIndex = '2147483647';
+
+      const from = center(handle);
+      const to = center(trash);
+
+      dispatchMouse(handle, 'mousedown', from.x, from.y);
+      fixture.detectChanges();
+      /*
+        Move in steps like a real pointer does. The first step passes the 5px
+        pickup threshold and starts the drag; jumping straight to the trash
+        leaves the preview lagging under the cursor, which blocks the drop.
+       */
+      const steps = 12;
+      for (let step = 1; step <= steps; step++) {
+        dispatchMouse(
+          document,
+          'mousemove',
+          from.x + ((to.x - from.x) * step) / steps,
+          from.y + ((to.y - from.y) * step) / steps
+        );
+      }
+      dispatchMouse(document, 'mouseup', to.x, to.y);
+      fixture.detectChanges();
+      // The drop is emitted once the preview has animated back to the placeholder.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
+    it('should delete the section', async () => {
+      await dragSectionToTrash('Packing');
+
+      expect(mockListService.removeSectionFromList).toHaveBeenCalledWith('list1', 's1');
+    });
+
+    it('should not delete the ungrouped section', async () => {
+      await dragSectionToTrash(UNGROUPED_SECTION_TITLE);
+
+      expect(mockListService.removeSectionFromList).not.toHaveBeenCalled();
+    });
   });
 
   // --- ungrouped section ---
