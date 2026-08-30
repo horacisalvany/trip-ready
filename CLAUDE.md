@@ -134,8 +134,8 @@ This was discovered as a real bug: sharing a list stopped working entirely becau
 ### To Test
 
 ```bash
-npm install   # or yarn install
-npm start     # or yarn start
+yarn install   # or yarn install
+yarn start     # or yarn start
 ```
 
 Then navigate to `http://localhost:4200` - you should be redirected to `/login`.

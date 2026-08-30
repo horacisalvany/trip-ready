@@ -139,6 +139,23 @@ export class ListService {
     );
   }
 
+  addEmptySectionToList(
+    listId: string,
+    title: string
+  ): Observable<string | null> {
+    return this.userPath().pipe(
+      take(1),
+      switchMap((path) => {
+        if (!path) return of(null);
+        return from(
+          this.db
+            .list(`${path}/lists/${listId}/sections`)
+            .push({ title, items: [] })
+        ).pipe(map((ref) => ref.key));
+      })
+    );
+  }
+
   removeSectionFromList(listId: string, sectionId: string): Observable<void> {
     return this.userPath().pipe(
       take(1),
@@ -209,6 +226,15 @@ export class ListService {
     };
     return from(
       this.db.list(`sharedLists/${listId}/sections`).push(sectionData)
+    ).pipe(map((ref) => ref.key));
+  }
+
+  addEmptySharedSectionToList(
+    listId: string,
+    title: string
+  ): Observable<string | null> {
+    return from(
+      this.db.list(`sharedLists/${listId}/sections`).push({ title, items: [] })
     ).pipe(map((ref) => ref.key));
   }
 

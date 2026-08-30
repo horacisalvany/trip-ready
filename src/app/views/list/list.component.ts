@@ -11,10 +11,12 @@ import { ActivatedRoute } from '@angular/router';
 import { take } from 'rxjs/operators';
 import { MaterialModule } from 'src/app/material.module';
 import { AuthService } from '../../services/auth.service';
-import { Group } from '../group/group';
 import { GroupService } from '../group/group.service';
 import { List } from '../lists/list';
-import { DialogAddGroupComponent } from './dialog-add-group/dialog-add-group.component';
+import {
+  AddSectionsResult,
+  DialogAddGroupComponent,
+} from './dialog-add-group/dialog-add-group.component';
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
 import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
 import { DRAG_START_DELAY } from '../drag-config';
@@ -111,15 +113,25 @@ export class ListComponent implements OnInit {
         data: { allGroups },
       });
 
-      dialogRef.afterClosed().subscribe((selectedGroups: Group[]) => {
-        if (selectedGroups && this.list) {
-          selectedGroups.forEach((group) => {
-            const obs = this.isShared
-              ? this.listService.addSharedSectionToList(this.list!.id, group)
-              : this.listService.addSectionToList(this.list!.id, group);
-            obs.subscribe();
-          });
+      dialogRef.afterClosed().subscribe((result: AddSectionsResult | undefined) => {
+        if (!result || !this.list) return;
+
+        // An untitled section would be indistinguishable on screen, so a blank
+        // field simply means "no new section" rather than an error.
+        const newSectionTitle = result.newSectionTitle?.trim();
+        if (newSectionTitle) {
+          const obs = this.isShared
+            ? this.listService.addEmptySharedSectionToList(this.list.id, newSectionTitle)
+            : this.listService.addEmptySectionToList(this.list.id, newSectionTitle);
+          obs.subscribe();
         }
+
+        result.groups.forEach((group) => {
+          const obs = this.isShared
+            ? this.listService.addSharedSectionToList(this.list!.id, group)
+            : this.listService.addSectionToList(this.list!.id, group);
+          obs.subscribe();
+        });
       });
     });
   }
