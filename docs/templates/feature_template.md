@@ -1,19 +1,20 @@
-# Sections should be addeable
+# Sections should be deletable
 
 ## Problem
 
-Currently, sections can only by created through selecting a prexisting group
+Currently, sections can be created and edited, but users cannot delete them.
+
 ## Expected behavior
 
-Users should be able to create a new section on the view's list
+Users should be able to delete a section from the section menu.
 
 ## Requirements
 
-- When user clicks on + icon on view's list, show a new option to create a new section.
-- Add the section in Firebase.
-- Update the UI immediately after clicks on OK.
+- Show a delete action in the section menu.
+- Ask for confirmation before deleting.
+- Remove the section from Firebase.
+- Update the UI immediately after deletion.
 - Do not affect other sections.
-- Do not validate if the name already exist
 
 ## Acceptance criteria
 
