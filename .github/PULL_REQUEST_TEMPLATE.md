@@ -1,6 +1,9 @@
 <!--
-  Title format: RIBMP-1234: lowercase imperative summary
-  Use RIBMP-0000 when there is no ticket.
+  Title format: <spec id>: lowercase imperative summary
+  The spec id is the prefix of the file in docs/specs/, e.g.
+  docs/specs/features/F01-add_section_on_list.md  ->  F01: allow creating a section
+
+  No spec for this change? Write one first — see docs/templates/.
 -->
 
 ## Story
