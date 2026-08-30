@@ -1,0 +1,26 @@
+/*
+  Both headings get their spacing from here rather than from the global
+  typography, so the two halves of the dialog keep their distance wherever the
+  component is rendered.
+ */
+h4 {
+  margin: 0 0 8px;
+}
+
+.new-section-title {
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  border-bottom: 1px solid #cbd5e1;
+  outline: none;
+  padding: 4px 8px;
+  font-size: 14px;
+
+  &:focus {
+    border-bottom-color: #3f51b5;
+  }
+}
+
+.group-selection {
+  margin-top: 32px;
+}

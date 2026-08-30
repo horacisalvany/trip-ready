@@ -32,7 +32,9 @@ Lists are travel checklists. Each list has one or more sections.
 
 - A user can create a list with a title.
 - Every list always has a default section called **Ungrouped** where items can be added directly (without a group).
+- A user can create a new, empty section by typing a title. The title must be at least one character (leading and trailing whitespace is ignored); a blank title simply creates nothing. Duplicate titles are allowed.
 - A user can add a group to a list, which creates a new section with the group's items.
+- Creating a section from a title and adding sections from groups happen in the same dialog (the `+` button on the list), and can be done together in one go. Existing sections are never modified.
 - A user can add items to any section.
 - A user can drag items between sections within the same list.
 - A user can delete an item by dragging it to the trash.

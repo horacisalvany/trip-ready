@@ -1,7 +1,17 @@
-<h1 mat-dialog-title>Add groups</h1>
+<h1 mat-dialog-title>Add sections</h1>
 <div mat-dialog-content>
-  <section class="example-section">
-    <h4>Select your groups:</h4>
+  <section class="new-section">
+    <h4>Create a new section:</h4>
+    <input
+      class="new-section-title"
+      [(ngModel)]="newSectionTitle"
+      type="text"
+      maxlength="40"
+      placeholder="Ex. Beach gear"
+    />
+  </section>
+  <section class="group-selection" *ngIf="groups.length">
+    <h4>Or pick from your groups:</h4>
     <p>
       <mat-checkbox
         (click)="onGroup(group.id)"

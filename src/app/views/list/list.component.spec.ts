@@ -10,6 +10,7 @@ import { of, Subject } from 'rxjs';
 import { ListComponent, formatSharedWith } from './list.component';
 import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
+import { AddSectionsResult } from './dialog-add-group/dialog-add-group.component';
 import { GroupService } from '../group/group.service';
 import { AuthService } from '../../services/auth.service';
 import { Group } from '../group/group';
@@ -35,6 +36,14 @@ const MOCK_GROUPS: Group[] = [
   { id: 'g3', title: 'Electronics', items: ['Phone', 'Charger'] },
 ];
 
+/*
+  What the add-sections dialog hands back: the groups that were ticked plus the
+  title typed into the "new section" field (empty when the user typed nothing).
+ */
+function dialogResult(groups: Group[], newSectionTitle = ''): AddSectionsResult {
+  return { groups, newSectionTitle };
+}
+
 describe('ListComponent', () => {
   let component: ListComponent;
   let fixture: ComponentFixture<ListComponent>;
@@ -47,8 +56,11 @@ describe('ListComponent', () => {
       'getList',
       'getSharedList',
       'addSectionToList',
+      'addEmptySectionToList',
       'removeSectionFromList',
       'updateSectionItems',
+      'addSharedSectionToList',
+      'addEmptySharedSectionToList',
       'updateSharedSectionItems',
     ]);
     mockListService.getList.and.returnValue(
@@ -58,9 +70,12 @@ describe('ListComponent', () => {
       })
     );
     mockListService.addSectionToList.and.returnValue(of('newSectionId'));
+    mockListService.addEmptySectionToList.and.returnValue(of('newSectionId'));
     mockListService.removeSectionFromList.and.returnValue(of(undefined));
     mockListService.updateSectionItems.and.returnValue(of(undefined));
     mockListService.getSharedList.and.returnValue(of({...MOCK_LIST, isShared: true, sections: MOCK_LIST.sections.map(s => ({...s, items: [...s.items]}))}));
+    mockListService.addSharedSectionToList.and.returnValue(of('newSectionId'));
+    mockListService.addEmptySharedSectionToList.and.returnValue(of('newSectionId'));
     mockListService.updateSharedSectionItems.and.returnValue(of(undefined));
 
     mockGroupService = jasmine.createSpyObj('GroupService', ['getGroups']);
@@ -464,9 +479,8 @@ describe('ListComponent', () => {
 
     setTimeout(() => {
       mockGroupService.getGroups.calls.reset();
-      const selectedGroups = [MOCK_GROUPS[0]];
       const dialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
-      dialogRef.afterClosed.and.returnValue(of(selectedGroups));
+      dialogRef.afterClosed.and.returnValue(of(dialogResult([MOCK_GROUPS[0]])));
       spyOn(component.dialog, 'open').and.returnValue(dialogRef);
 
       component.openDialogAddGroup();
@@ -479,9 +493,8 @@ describe('ListComponent', () => {
   // --- openDialogAddGroup ---
 
   it('should fetch groups, open dialog, and create sections for selected groups', () => {
-    const selectedGroups = [MOCK_GROUPS[1]]; // Documents
     const dialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
-    dialogRef.afterClosed.and.returnValue(of(selectedGroups));
+    dialogRef.afterClosed.and.returnValue(of(dialogResult([MOCK_GROUPS[1]])));
     spyOn(component.dialog, 'open').and.returnValue(dialogRef);
 
     component.openDialogAddGroup();
@@ -495,9 +508,10 @@ describe('ListComponent', () => {
   });
 
   it('should create a section for each selected group', () => {
-    const selectedGroups = [MOCK_GROUPS[0], MOCK_GROUPS[2]];
     const dialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
-    dialogRef.afterClosed.and.returnValue(of(selectedGroups));
+    dialogRef.afterClosed.and.returnValue(
+      of(dialogResult([MOCK_GROUPS[0], MOCK_GROUPS[2]]))
+    );
     spyOn(component.dialog, 'open').and.returnValue(dialogRef);
 
     component.openDialogAddGroup();
@@ -519,14 +533,92 @@ describe('ListComponent', () => {
 
   it('should not create sections when list is undefined', () => {
     component.list = undefined;
-    const selectedGroups = [MOCK_GROUPS[0]];
     const dialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
-    dialogRef.afterClosed.and.returnValue(of(selectedGroups));
+    dialogRef.afterClosed.and.returnValue(of(dialogResult([MOCK_GROUPS[0]])));
     spyOn(component.dialog, 'open').and.returnValue(dialogRef);
 
     component.openDialogAddGroup();
 
     expect(mockListService.addSectionToList).not.toHaveBeenCalled();
+  });
+
+  // --- creating a section from a typed title (F01) ---
+
+  describe('new section from the dialog title field', () => {
+    function closeDialogWith(result: AddSectionsResult | undefined): void {
+      const dialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
+      dialogRef.afterClosed.and.returnValue(of(result));
+      spyOn(component.dialog, 'open').and.returnValue(dialogRef);
+      component.openDialogAddGroup();
+    }
+
+    it('should create an empty section with the typed title', () => {
+      closeDialogWith(dialogResult([], 'Beach gear'));
+
+      expect(mockListService.addEmptySectionToList).toHaveBeenCalledWith(
+        'list1',
+        'Beach gear'
+      );
+    });
+
+    it('should trim whitespace from the typed title', () => {
+      closeDialogWith(dialogResult([], '  Beach gear  '));
+
+      expect(mockListService.addEmptySectionToList).toHaveBeenCalledWith(
+        'list1',
+        'Beach gear'
+      );
+    });
+
+    it('should not create a section when the title is empty', () => {
+      closeDialogWith(dialogResult([MOCK_GROUPS[0]], ''));
+
+      expect(mockListService.addEmptySectionToList).not.toHaveBeenCalled();
+    });
+
+    it('should not create a section when the title is whitespace only', () => {
+      closeDialogWith(dialogResult([], '   '));
+
+      expect(mockListService.addEmptySectionToList).not.toHaveBeenCalled();
+    });
+
+    it('should not create a section when the dialog is cancelled', () => {
+      closeDialogWith(undefined);
+
+      expect(mockListService.addEmptySectionToList).not.toHaveBeenCalled();
+    });
+
+    it('should not create a section when list is undefined', () => {
+      component.list = undefined;
+      closeDialogWith(dialogResult([], 'Beach gear'));
+
+      expect(mockListService.addEmptySectionToList).not.toHaveBeenCalled();
+    });
+
+    /*
+      A typed title and ticked groups are independent: asking for both must
+      produce both, and must not disturb the sections already on the list.
+     */
+    it('should create the typed section alongside the selected group sections', () => {
+      const sectionsBefore = component.list!.sections.map((s) => ({
+        ...s,
+        items: [...s.items],
+      }));
+
+      closeDialogWith(dialogResult([MOCK_GROUPS[1]], 'Beach gear'));
+
+      expect(mockListService.addEmptySectionToList).toHaveBeenCalledOnceWith(
+        'list1',
+        'Beach gear'
+      );
+      expect(mockListService.addSectionToList).toHaveBeenCalledOnceWith(
+        'list1',
+        MOCK_GROUPS[1]
+      );
+      expect(mockListService.removeSectionFromList).not.toHaveBeenCalled();
+      expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
+      expect(component.list!.sections).toEqual(sectionsBefore);
+    });
   });
 
   // --- openDialogAddGroup should only open dialog once (take(1)) ---
@@ -581,6 +673,21 @@ describe('ListComponent', () => {
 
   it('should have isShared false by default', () => {
     expect(component.isShared).toBeFalse();
+  });
+
+  it('should create a typed section on the shared node when the list is shared', () => {
+    component.isShared = true;
+    const dialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
+    dialogRef.afterClosed.and.returnValue(of(dialogResult([], 'Beach gear')));
+    spyOn(component.dialog, 'open').and.returnValue(dialogRef);
+
+    component.openDialogAddGroup();
+
+    expect(mockListService.addEmptySharedSectionToList).toHaveBeenCalledWith(
+      'list1',
+      'Beach gear'
+    );
+    expect(mockListService.addEmptySectionToList).not.toHaveBeenCalled();
   });
 
   // --- route param handling ---

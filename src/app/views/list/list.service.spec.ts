@@ -80,6 +80,44 @@ describe('ListService', () => {
     });
   });
 
+  describe('addEmptySectionToList', () => {
+    it('should push a titled section with no items under the user lists path', (done) => {
+      const mockListRef = jasmine.createSpyObj('AngularFireList', ['push']);
+      mockListRef.push.and.returnValue(Promise.resolve({ key: 'newSectionKey' }));
+      mockDb.list.and.returnValue(mockListRef);
+
+      service.addEmptySectionToList('l1', 'Beach gear').subscribe((key) => {
+        expect(mockDb.list).toHaveBeenCalledWith('users/testUid/lists/l1/sections');
+        expect(mockListRef.push).toHaveBeenCalledWith({
+          title: 'Beach gear',
+          items: [],
+        });
+        expect(key).toBe('newSectionKey');
+        done();
+      });
+    });
+  });
+
+  describe('addEmptySharedSectionToList', () => {
+    it('should push a titled section with no items under the sharedLists path', (done) => {
+      const mockListRef = jasmine.createSpyObj('AngularFireList', ['push']);
+      mockListRef.push.and.returnValue(Promise.resolve({ key: 'newSectionKey' }));
+      mockDb.list.and.returnValue(mockListRef);
+
+      service
+        .addEmptySharedSectionToList('sharedId1', 'Beach gear')
+        .subscribe((key) => {
+          expect(mockDb.list).toHaveBeenCalledWith('sharedLists/sharedId1/sections');
+          expect(mockListRef.push).toHaveBeenCalledWith({
+            title: 'Beach gear',
+            items: [],
+          });
+          expect(key).toBe('newSectionKey');
+          done();
+        });
+    });
+  });
+
   describe('getSharedList', () => {
     it('should read from sharedLists path', (done) => {
       mockDbObject.valueChanges.and.returnValue(
