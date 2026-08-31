@@ -117,3 +117,14 @@ Sharing turns a private list into a collaborative document with a single source 
 - `/list/shared/:id` — Single shared list view
 - `/group` — Groups overview
 - `/login` — Login / registration
+
+---
+
+## Install / home-screen shortcut
+
+- Adding the site to a phone's home screen shows the TripReady bag logo (the
+  same glyph as the toolbar) on the purple-to-indigo toolbar gradient — never a
+  browser-generated letter tile.
+- The shortcut opens the app standalone (no browser chrome), titled `TripReady`.
+- Icons live in `src/assets/img/` and are declared in `src/manifest.webmanifest`
+  (Android/Chrome) and via `apple-touch-icon` in `src/index.html` (iOS).
