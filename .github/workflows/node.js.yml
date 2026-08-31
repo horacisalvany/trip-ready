@@ -20,11 +20,12 @@ jobs:
         # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    - run: npm run build:components
-    - run: npm run test:prod
+        cache: 'yarn'
+    - run: yarn install --frozen-lockfile
+    - run: yarn build:prod
+    - run: yarn test:prod
