@@ -53,12 +53,14 @@ Firebase config goes in `src/environments/environment.ts`.
 
 ```bash
 yarn start        # Dev server
-yarn build        # Development build
-yarn build:prod   # Production build
+yarn build        # Build (ng build already defaults to the production configuration)
+yarn build:prod   # Production build, stated explicitly
 yarn test         # Run tests (Karma)
 yarn test:prod    # Headless tests with coverage
-yarn deploy       # Build for production and deploy to Firebase Hosting
+yarn deploy       # Build for production and deploy to Firebase Hosting, manually
 ```
+
+Deploys are automatic: merging to `main` deploys the live site from GitHub Actions, and every pull request gets a temporary preview URL. `yarn deploy` is only needed to ship something that isn't on `main`.
 
 See [`docs/deploy.md`](docs/deploy.md) for full deployment instructions.
 
