@@ -1,4 +1,8 @@
-# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
+# Builds and tests the app, then deploys it to Firebase Hosting:
+#   - pull request  -> a temporary preview channel, commented on the PR
+#   - merge to main -> the live site
+# Both deploys reuse the bundle built and tested by the `build` job, so what
+# ships is the exact artifact that passed the test suite.
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
 
 name: Node.js CI
@@ -29,3 +33,58 @@ jobs:
     - run: yarn install --frozen-lockfile
     - run: yarn build:prod
     - run: yarn test:prod
+    - name: Upload the production bundle for the deploy jobs
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist
+        path: dist/
+        retention-days: 1
+
+  # A preview URL per pull request, so a change can be checked on a real device
+  # before it is merged. The channel expires on its own after 7 days.
+  deploy-preview:
+    needs: build
+    if: github.event_name == 'pull_request'
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      checks: write
+      contents: read
+      pull-requests: write
+
+    steps:
+    # firebase.json and .firebaserc describe what to deploy and where.
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        name: dist
+        path: dist
+    - uses: FirebaseExtended/action-hosting-deploy@v0
+      with:
+        repoToken: ${{ secrets.GITHUB_TOKEN }}
+        firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_READY4TRIP_5D3F6 }}
+        projectId: ready4trip-5d3f6
+        expires: 7d
+
+  deploy-live:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        name: dist
+        path: dist
+    - uses: FirebaseExtended/action-hosting-deploy@v0
+      with:
+        repoToken: ${{ secrets.GITHUB_TOKEN }}
+        firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_READY4TRIP_5D3F6 }}
+        projectId: ready4trip-5d3f6
+        channelId: live
