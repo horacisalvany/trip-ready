@@ -841,4 +841,91 @@ describe('ListComponent', () => {
       expect(shareButton()).toBeNull();
     });
   });
+
+  // --- collapse / expand all sections ---
+
+  describe('collapse/expand all sections', () => {
+    function toggleButton() {
+      return fixture.debugElement.query(By.css('.toggle-sections'));
+    }
+
+    function toggleIconName(): string {
+      return toggleButton().query(By.css('mat-icon')).nativeElement.textContent.trim();
+    }
+
+    function sectionItems() {
+      return fixture.debugElement.queryAll(By.css('mat-list-item'));
+    }
+
+    function addItemRows() {
+      return fixture.debugElement.queryAll(By.css('.add-item-row'));
+    }
+
+    function sectionHeaders() {
+      return fixture.debugElement.queryAll(By.css('.section-header'));
+    }
+
+    function clickToggle(): void {
+      toggleButton().nativeElement.click();
+      fixture.detectChanges();
+    }
+
+    it('should start with the sections expanded', () => {
+      expect(component.sectionsCollapsed).toBeFalse();
+      expect(sectionItems().length).toBe(4);
+      expect(addItemRows().length).toBe(3);
+    });
+
+    it('should show the collapse icon while the sections are expanded', () => {
+      expect(toggleIconName()).toBe('unfold_less');
+    });
+
+    it('should sit between the share and add buttons', () => {
+      const buttons = fixture.debugElement
+        .queryAll(By.css('.button-row button'))
+        .map((el) => el.query(By.css('mat-icon')).nativeElement.textContent.trim());
+
+      expect(buttons).toEqual(['share', 'unfold_less', 'add']);
+    });
+
+    it('should collapse every section when clicked while expanded', () => {
+      clickToggle();
+
+      expect(component.sectionsCollapsed).toBeTrue();
+      expect(sectionItems().length).toBe(0);
+      expect(addItemRows().length).toBe(0);
+    });
+
+    it('should keep the section titles visible while collapsed', () => {
+      clickToggle();
+
+      const titles = sectionHeaders().map((el) =>
+        el.query(By.css('h2')).nativeElement.textContent.trim()
+      );
+      expect(titles).toEqual([UNGROUPED_SECTION_TITLE, 'Packing', 'Electronics']);
+    });
+
+    it('should show the expand icon while the sections are collapsed', () => {
+      clickToggle();
+
+      expect(toggleIconName()).toBe('unfold_more');
+    });
+
+    it('should expand every section when clicked while collapsed', () => {
+      clickToggle();
+      clickToggle();
+
+      expect(component.sectionsCollapsed).toBeFalse();
+      expect(sectionItems().length).toBe(4);
+      expect(addItemRows().length).toBe(3);
+      expect(toggleIconName()).toBe('unfold_less');
+    });
+
+    it('should not write the collapsed state to the backend', () => {
+      clickToggle();
+
+      expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
+      expect(mockListService.updateSharedSectionItems).not.toHaveBeenCalled();
+    });
+  });
 });

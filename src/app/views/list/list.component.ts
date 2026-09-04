@@ -39,6 +39,11 @@ export function formatSharedWith(emails: string[]): string {
 export class ListComponent implements OnInit {
   list: List | undefined;
   isShared = false;
+  /*
+    Purely a view preference, so it lives in the component and is not persisted:
+    reopening the list shows every section expanded again.
+   */
+  sectionsCollapsed = false;
   readonly dragStartDelay = DRAG_START_DELAY;
   currentUserUid: string | null = null;
   /*
@@ -95,6 +100,22 @@ export class ListComponent implements OnInit {
   */
   get canShare(): boolean {
     return !this.list?.isShared || this.list.ownerUid === this.currentUserUid;
+  }
+
+  /*
+    The icon always shows the action, not the state: collapsed sections offer
+    "expand", expanded ones offer "collapse".
+   */
+  get toggleSectionsIcon(): string {
+    return this.sectionsCollapsed ? 'unfold_more' : 'unfold_less';
+  }
+
+  get toggleSectionsLabel(): string {
+    return this.sectionsCollapsed ? 'Expand all sections' : 'Collapse all sections';
+  }
+
+  toggleSections(): void {
+    this.sectionsCollapsed = !this.sectionsCollapsed;
   }
 
   openShareDialog(): void {
