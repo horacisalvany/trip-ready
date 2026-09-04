@@ -36,6 +36,7 @@ Lists are travel checklists. Each list has one or more sections.
 - A user can add a group to a list, which creates a new section with the group's items.
 - Creating a section from a title and adding sections from groups happen in the same dialog (the `+` button on the list), and can be done together in one go. Existing sections are never modified.
 - A user can add items to any section.
+- A user can collapse or expand every section of a list at once with a single button on the list header, placed between the share and the `+` buttons. The button always shows the action it performs: `unfold_less` (collapse) while the sections are expanded, `unfold_more` (expand) while they are collapsed. Collapsed sections keep their title visible and hide their items and their "new item" field. The state is a view preference only — it is not stored, so reopening the list shows every section expanded.
 - A user can drag items between sections within the same list.
 - A user can delete an item by dragging it to the trash.
 - A user can delete a section (except Ungrouped) by dragging it to the trash.

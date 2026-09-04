@@ -23,6 +23,16 @@
     >
       <mat-icon>share</mat-icon>
     </button>
+    <button
+      (click)="toggleSections()"
+      class="toggle-sections"
+      mat-icon-button
+      [title]="toggleSectionsLabel"
+      [attr.aria-label]="toggleSectionsLabel"
+      [attr.aria-expanded]="!sectionsCollapsed"
+    >
+      <mat-icon>{{ toggleSectionsIcon }}</mat-icon>
+    </button>
     <button (click)="openDialogAddGroup()" mat-icon-button>
       <mat-icon>add</mat-icon>
     </button>
@@ -53,42 +63,44 @@
         <mat-icon *ngIf="!isUngroupedSection(section.title)" class="drag-handle">drag_indicator</mat-icon>
         <h2>{{ section.title }}</h2>
       </div>
-      <mat-list
-        role="list"
-        cdkDropList
-        [cdkDropListData]="section.items"
-        [id]="'cdk-drop-list-section-' + section.id"
-        [cdkDropListConnectedTo]="getItemConnectedIds(section.id)"
-        (cdkDropListDropped)="dropItem($event)"
-      >
-        <mat-list-item
-          cdkDrag
-          [cdkDragData]="{ type: 'item', sectionId: section.id }"
-          [cdkDragStartDelay]="dragStartDelay"
-          *ngFor="let item of section.items"
-        >{{ item }}</mat-list-item>
-      </mat-list>
-      <div class="add-item-row">
-        <input
-          #itemInput
-          type="text"
-          maxlength="40"
-          placeholder="New item..."
-          (keyup.enter)="
-            onAddItemToSection(section.id, itemInput.value);
-            itemInput.value = ''
-          "
-        />
-        <button
-          mat-icon-button
-          (click)="
-            onAddItemToSection(section.id, itemInput.value);
-            itemInput.value = ''
-          "
+      <ng-container *ngIf="!sectionsCollapsed">
+        <mat-list
+          role="list"
+          cdkDropList
+          [cdkDropListData]="section.items"
+          [id]="'cdk-drop-list-section-' + section.id"
+          [cdkDropListConnectedTo]="getItemConnectedIds(section.id)"
+          (cdkDropListDropped)="dropItem($event)"
         >
-          <mat-icon>add</mat-icon>
-        </button>
-      </div>
+          <mat-list-item
+            cdkDrag
+            [cdkDragData]="{ type: 'item', sectionId: section.id }"
+            [cdkDragStartDelay]="dragStartDelay"
+            *ngFor="let item of section.items"
+          >{{ item }}</mat-list-item>
+        </mat-list>
+        <div class="add-item-row">
+          <input
+            #itemInput
+            type="text"
+            maxlength="40"
+            placeholder="New item..."
+            (keyup.enter)="
+              onAddItemToSection(section.id, itemInput.value);
+              itemInput.value = ''
+            "
+          />
+          <button
+            mat-icon-button
+            (click)="
+              onAddItemToSection(section.id, itemInput.value);
+              itemInput.value = ''
+            "
+          >
+            <mat-icon>add</mat-icon>
+          </button>
+        </div>
+      </ng-container>
     </div>
   </div>
 </div>
