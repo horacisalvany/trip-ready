@@ -6,7 +6,6 @@ import { UNGROUPED_SECTION_TITLE } from '../list.service';
 import {
   BLANK_TITLE_ERROR,
   DialogRenameSectionComponent,
-  RESERVED_TITLE_ERROR,
 } from './dialog-rename-section.component';
 
 describe('DialogRenameSectionComponent', () => {
@@ -143,28 +142,18 @@ describe('DialogRenameSectionComponent', () => {
   });
 
   /*
-    "Ungrouped" identifies the default section by title all over the app, so a
-    second section with that name would become undeletable and would compete for
-    the top slot in the list.
+    Ungrouped is an ordinary section, so its name is not reserved any more than
+    any other duplicate is — the add-section dialog accepts it too.
    */
-  it('should reject the reserved Ungrouped title and stay open', () => {
+  it('should accept the Ungrouped title like any other', () => {
     render();
     component.title = UNGROUPED_SECTION_TITLE;
 
     component.onRename();
     fixture.detectChanges();
 
-    expect(dialogRef.close).not.toHaveBeenCalled();
-    expect(errorText()).toBe(RESERVED_TITLE_ERROR);
-  });
-
-  it('should reject the reserved title even when padded with whitespace', () => {
-    render();
-    component.title = `  ${UNGROUPED_SECTION_TITLE}  `;
-
-    component.onRename();
-
-    expect(dialogRef.close).not.toHaveBeenCalled();
+    expect(dialogRef.close).toHaveBeenCalledWith(UNGROUPED_SECTION_TITLE);
+    expect(errorText()).toBeNull();
   });
 
   it('should not show an error before anything is submitted', () => {

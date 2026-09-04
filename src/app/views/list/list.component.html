@@ -57,10 +57,9 @@
       cdkDrag
       [cdkDragData]="{ type: 'section', id: section.id }"
       [cdkDragStartDelay]="dragStartDelay"
-      [cdkDragDisabled]="isUngroupedSection(section.title)"
     >
-      <div class="section-header" [class.no-drag]="isUngroupedSection(section.title)" cdkDragHandle>
-        <mat-icon *ngIf="!isUngroupedSection(section.title)" class="drag-handle">drag_indicator</mat-icon>
+      <div class="section-header" cdkDragHandle>
+        <mat-icon class="drag-handle">drag_indicator</mat-icon>
         <!--
           The pencil lives inside the h2, in the text flow, so it wraps with the
           last word instead of claiming a column of its own: on a phone the card
@@ -68,16 +67,15 @@
           is the whole pill, and the glyph is only the hint that says so.
         -->
         <h2
-          [class.renameable]="isRenameable(section)"
-          [attr.role]="isRenameable(section) ? 'button' : null"
-          [attr.tabindex]="isRenameable(section) ? 0 : null"
-          [attr.aria-label]="isRenameable(section) ? renameLabel(section) : null"
+          role="button"
+          tabindex="0"
+          [attr.aria-label]="renameLabel(section)"
           (mousedown)="onTitlePressStart($event)"
           (click)="openRenameDialog(section, $event)"
           (keyup.enter)="openRenameDialog(section)"
         >
           <span class="section-title-text">{{ section.title }}</span>
-          <mat-icon *ngIf="isRenameable(section)" class="rename-hint">edit</mat-icon>
+          <mat-icon class="rename-hint">edit</mat-icon>
         </h2>
       </div>
       <ng-container *ngIf="!sectionsCollapsed">

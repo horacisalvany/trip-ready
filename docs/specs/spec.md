@@ -31,16 +31,16 @@ Groups are reusable templates of items that can be added to lists as sections.
 Lists are travel checklists. Each list has one or more sections.
 
 - A user can create a list with a title.
-- Every list always has a default section called **Ungrouped** where items can be added directly (without a group).
+- Every new list starts with a default section called **Ungrouped** where items can be added directly (without a group). Like any other section, it can be deleted; once deleted it is not recreated automatically.
 - A user can create a new, empty section by typing a title. The title must be at least one character (leading and trailing whitespace is ignored); a blank title simply creates nothing. Duplicate titles are allowed.
 - A user can add a group to a list, which creates a new section with the group's items.
 - Creating a section from a title and adding sections from groups happen in the same dialog (the `+` button on the list), and can be done together in one go. Existing sections are never modified.
-- A user can rename any section except **Ungrouped** by tapping its title, which opens a dialog with the current title pre-filled. A faint pencil glyph inside the title marks it as editable. The dialog rejects a blank title, and rejects `Ungrouped` because that title identifies the default section throughout the app; in both cases it shows an error and stays open. A title equal to the current one closes without writing. Titles are capped at 40 characters and duplicates are otherwise allowed. The section keeps its id and its items.
+- A user can rename any section, including Ungrouped, by tapping its title, which opens a dialog with the current title pre-filled. A faint pencil glyph inside the title marks it as editable. The dialog rejects a blank title with an error and stays open. A title equal to the current one closes without writing. Titles are capped at 40 characters and duplicates are allowed, as they are when a section is created. The section keeps its id and its items.
 - A user can add items to any section.
 - A user can collapse or expand every section of a list at once with a single button on the list header, placed between the share and the `+` buttons. The button always shows the action it performs: `unfold_less` (collapse) while the sections are expanded, `unfold_more` (expand) while they are collapsed. Collapsed sections keep their title visible and hide their items and their "new item" field. The state is a view preference only — it is not stored, so reopening the list shows every section expanded.
 - A user can drag items between sections within the same list.
 - A user can delete an item by dragging it to the trash.
-- A user can delete a section (except Ungrouped) by dragging it to the trash.
+- A user can delete a section, including Ungrouped, by dragging it to the trash.
 - A user can delete a list by dragging it to the trash on the lists overview screen.
 - Lists are private to the user who created them, unless shared.
 

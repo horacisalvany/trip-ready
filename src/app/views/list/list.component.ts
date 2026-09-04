@@ -19,7 +19,7 @@ import {
 } from './dialog-add-group/dialog-add-group.component';
 import { DialogRenameSectionComponent } from './dialog-rename-section/dialog-rename-section.component';
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
-import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
+import { ListService } from './list.service';
 import { Section } from './section';
 import { DRAG_START_DELAY } from '../drag-config';
 
@@ -180,18 +180,6 @@ export class ListComponent implements OnInit {
     }
   }
 
-  isUngroupedSection(title: string): boolean {
-    return title === UNGROUPED_SECTION_TITLE;
-  }
-
-  /*
-    Ungrouped is identified by its title everywhere in the app, so it is the one
-    section whose name has to stay put.
-   */
-  isRenameable(section: Section): boolean {
-    return !this.isUngroupedSection(section.title);
-  }
-
   renameLabel(section: Section): string {
     return `Rename section ${section.title}`;
   }
@@ -211,7 +199,7 @@ export class ListComponent implements OnInit {
     and silently break renaming from then on.
    */
   openRenameDialog(section: Section, event?: MouseEvent): void {
-    if (!this.list || !this.isRenameable(section)) return;
+    if (!this.list) return;
 
     const pressedAt = this.titlePressAt;
     this.titlePressAt = null;
@@ -245,8 +233,6 @@ export class ListComponent implements OnInit {
     if (!this.list) return;
 
     if (dragData?.type === 'section') {
-      const section = this.list.sections.find((s) => s.id === dragData.id);
-      if (section && this.isUngroupedSection(section.title)) return;
       const obs = this.isShared
         ? this.listService.removeSharedSectionFromList(this.list.id, dragData.id)
         : this.listService.removeSectionFromList(this.list.id, dragData.id);

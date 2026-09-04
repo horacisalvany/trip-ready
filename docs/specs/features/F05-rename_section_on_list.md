@@ -13,7 +13,9 @@ Tapping a section's title on the list view opens a small dialog with the current
 title in a text field. Confirming renames the section; cancelling leaves it
 untouched. A faint pencil glyph after the title marks it as editable.
 
-`Ungrouped` is the exception: it has no pencil and tapping it does nothing.
+Every section behaves the same way, `Ungrouped` included: F04 made it deletable,
+so it is an ordinary section now, and singling it out here would mean a user could
+destroy it but not correct its name.
 
 ## Why the title and not an icon button
 
@@ -35,21 +37,20 @@ shares.
 
 ## Requirements
 
-- Every section title except `Ungrouped` shows a faint pencil glyph inside the
-  title pill, after the text, and is tappable.
+- Every section title shows a faint pencil glyph inside the title pill, after the
+  text, and is tappable.
 - Tapping the title opens a "Rename section" dialog with the current title
   pre-filled and the field focused.
 - Confirming with a changed, valid title writes the new title to Firebase.
 - Cancelling writes nothing.
 - A title that is blank or whitespace-only is rejected: the dialog shows an error
   and stays open.
-- A title that trims to `Ungrouped` is rejected the same way. `Ungrouped` is
-  identified by title throughout the app, so a second section with that name
-  would become undeletable and would fight the first one for the top slot.
+- A blank title is the only rejection. `Ungrouped` is accepted like any other
+  name, matching the add-sections dialog, which has always allowed it.
 - A title equal to the current one (after trimming) closes the dialog without
   writing.
 - Titles are limited to 40 characters, like the add-section field.
-- Duplicate titles are allowed otherwise, matching F01.
+- Duplicate titles are allowed, matching F01.
 - Renaming works the same on private and shared lists.
 - The section keeps its id and its items. No other section is touched.
 - Tapping the title must not interfere with dragging the section to the trash,
@@ -57,15 +58,13 @@ shares.
 
 ## Acceptance criteria
 
-- [x] User can rename any section except `Ungrouped`.
+- [x] User can rename any section, `Ungrouped` included.
 - [x] The dialog opens pre-filled with the current title.
 - [x] Cancelling changes nothing.
 - [x] A blank title is rejected and the dialog stays open.
-- [x] Renaming a section to `Ungrouped` is rejected.
 - [x] The renamed section keeps its items.
 - [x] Other sections remain untouched.
 - [x] Renaming works on a shared list and is visible to every participant.
-- [x] `Ungrouped` shows no pencil and does not react to a tap.
 - [x] Dragging a section to the trash does not open the rename dialog.
 - [x] Swiping to scroll the list does not open the rename dialog.
 

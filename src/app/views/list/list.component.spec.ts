@@ -293,21 +293,16 @@ describe('ListComponent', () => {
       expect(mockListService.removeSectionFromList).toHaveBeenCalledWith('list1', 's1');
     });
 
-    it('should not delete the ungrouped section', async () => {
+    it('should delete the ungrouped section', async () => {
       await dragSectionToTrash(UNGROUPED_SECTION_TITLE);
 
-      expect(mockListService.removeSectionFromList).not.toHaveBeenCalled();
+      expect(mockListService.removeSectionFromList).toHaveBeenCalledWith('list1', 'ungrouped');
     });
   });
 
   // --- ungrouped section ---
 
-  it('should identify ungrouped section correctly', () => {
-    expect(component.isUngroupedSection(UNGROUPED_SECTION_TITLE)).toBeTrue();
-    expect(component.isUngroupedSection('Packing')).toBeFalse();
-  });
-
-  it('should not remove ungrouped section when dropped on trash', () => {
+  it('should remove ungrouped section when dropped on trash', () => {
     const event = {
       previousIndex: 0,
       previousContainer: { id: 'sections' },
@@ -317,7 +312,7 @@ describe('ListComponent', () => {
 
     component.dropTrash(event);
 
-    expect(mockListService.removeSectionFromList).not.toHaveBeenCalled();
+    expect(mockListService.removeSectionFromList).toHaveBeenCalledWith('list1', 'ungrouped');
   });
 
   // --- dropTrash ---
@@ -937,7 +932,7 @@ describe('ListComponent', () => {
     });
   });
 
-  // --- renaming a section (F04) ---
+  // --- renaming a section (F05) ---
 
   describe('renaming a section', () => {
     function titleOf(sectionTitle: string) {
@@ -969,37 +964,25 @@ describe('ListComponent', () => {
       });
     }
 
-    it('should show a rename hint on every section except Ungrouped', () => {
+    it('should show a rename hint on every section', () => {
       const hintOwners = fixture.debugElement
         .queryAll(By.css('.section-header h2'))
         .filter((el) => el.query(By.css('.rename-hint')))
         .map((el) => el.query(By.css('.section-title-text')).nativeElement.textContent.trim());
 
-      expect(hintOwners).toEqual(['Packing', 'Electronics']);
+      expect(hintOwners).toEqual([UNGROUPED_SECTION_TITLE, 'Packing', 'Electronics']);
     });
 
     /*
       The pill is the tap target, not the glyph, so it has to announce itself as
-      a control. Ungrouped is not one and must not be focusable.
+      a control.
      */
-    it('should expose a renameable title as a keyboard-reachable button', () => {
+    it('should expose a title as a keyboard-reachable button', () => {
       const title = titleOf('Packing').nativeElement as HTMLElement;
 
       expect(title.getAttribute('role')).toBe('button');
       expect(title.getAttribute('tabindex')).toBe('0');
       expect(title.getAttribute('aria-label')).toBe('Rename section Packing');
-    });
-
-    it('should leave the Ungrouped title inert', () => {
-      const title = titleOf(UNGROUPED_SECTION_TITLE).nativeElement as HTMLElement;
-
-      expect(title.getAttribute('role')).toBeNull();
-      expect(title.getAttribute('tabindex')).toBeNull();
-    });
-
-    it('should identify which sections may be renamed', () => {
-      expect(component.isRenameable(MOCK_SECTIONS[0])).toBeFalse();
-      expect(component.isRenameable(MOCK_SECTIONS[1])).toBeTrue();
     });
 
     it('should open the dialog prefilled with the current title when tapped', () => {
@@ -1043,13 +1026,20 @@ describe('ListComponent', () => {
       expect(mockListService.removeSectionFromList).not.toHaveBeenCalled();
     });
 
-    it('should ignore a tap on the Ungrouped title', () => {
-      const open = stubDialog('Anything');
+    /*
+      Ungrouped is an ordinary section since it became deletable, so it renames
+      like the rest rather than being singled out.
+     */
+    it('should rename the Ungrouped section like any other', () => {
+      stubDialog('Odds and ends');
 
       pressAndClick(UNGROUPED_SECTION_TITLE);
 
-      expect(open).not.toHaveBeenCalled();
-      expect(mockListService.renameSection).not.toHaveBeenCalled();
+      expect(mockListService.renameSection).toHaveBeenCalledWith(
+        'list1',
+        'ungrouped',
+        'Odds and ends'
+      );
     });
 
     it('should not open the dialog when the list is undefined', () => {

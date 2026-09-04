@@ -7,10 +7,8 @@ import {
   MatDialogRef,
 } from '@angular/material/dialog';
 import { MaterialModule } from 'src/app/material.module';
-import { UNGROUPED_SECTION_TITLE } from '../list.service';
 
 export const BLANK_TITLE_ERROR = 'Please enter a section name';
-export const RESERVED_TITLE_ERROR = `"${UNGROUPED_SECTION_TITLE}" is reserved for the default section`;
 
 @Component({
   selector: 'dialog-rename-section',
@@ -31,26 +29,18 @@ export class DialogRenameSectionComponent {
   }
 
   /*
-    Closes with the new title, or keeps the dialog open with an error. Renaming
-    to the current title is a no-op rather than an error: the user has changed
-    their mind, not made a mistake, so it closes without a value and the caller
-    writes nothing.
+    Closes with the new title, or keeps the dialog open with an error. A blank
+    name is the only thing rejected: duplicates are allowed here just as they
+    are when a section is created, "Ungrouped" included, since that section is
+    no longer special. Renaming to the current title is a no-op rather than an
+    error: the user has changed their mind, not made a mistake, so it closes
+    without a value and the caller writes nothing.
    */
   onRename(): void {
     const title = this.title.trim();
 
     if (!title) {
       this.errorMessage = BLANK_TITLE_ERROR;
-      return;
-    }
-
-    /*
-      "Ungrouped" identifies the default section by title all over the app, so a
-      second section carrying that name would become undeletable and would fight
-      the real one for the top slot in the list.
-     */
-    if (title === UNGROUPED_SECTION_TITLE) {
-      this.errorMessage = RESERVED_TITLE_ERROR;
       return;
     }
 
