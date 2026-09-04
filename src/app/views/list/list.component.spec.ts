@@ -285,21 +285,16 @@ describe('ListComponent', () => {
       expect(mockListService.removeSectionFromList).toHaveBeenCalledWith('list1', 's1');
     });
 
-    it('should not delete the ungrouped section', async () => {
+    it('should delete the ungrouped section', async () => {
       await dragSectionToTrash(UNGROUPED_SECTION_TITLE);
 
-      expect(mockListService.removeSectionFromList).not.toHaveBeenCalled();
+      expect(mockListService.removeSectionFromList).toHaveBeenCalledWith('list1', 'ungrouped');
     });
   });
 
   // --- ungrouped section ---
 
-  it('should identify ungrouped section correctly', () => {
-    expect(component.isUngroupedSection(UNGROUPED_SECTION_TITLE)).toBeTrue();
-    expect(component.isUngroupedSection('Packing')).toBeFalse();
-  });
-
-  it('should not remove ungrouped section when dropped on trash', () => {
+  it('should remove ungrouped section when dropped on trash', () => {
     const event = {
       previousIndex: 0,
       previousContainer: { id: 'sections' },
@@ -309,7 +304,7 @@ describe('ListComponent', () => {
 
     component.dropTrash(event);
 
-    expect(mockListService.removeSectionFromList).not.toHaveBeenCalled();
+    expect(mockListService.removeSectionFromList).toHaveBeenCalledWith('list1', 'ungrouped');
   });
 
   // --- dropTrash ---

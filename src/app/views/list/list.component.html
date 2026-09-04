@@ -57,10 +57,9 @@
       cdkDrag
       [cdkDragData]="{ type: 'section', id: section.id }"
       [cdkDragStartDelay]="dragStartDelay"
-      [cdkDragDisabled]="isUngroupedSection(section.title)"
     >
-      <div class="section-header" [class.no-drag]="isUngroupedSection(section.title)" cdkDragHandle>
-        <mat-icon *ngIf="!isUngroupedSection(section.title)" class="drag-handle">drag_indicator</mat-icon>
+      <div class="section-header" cdkDragHandle>
+        <mat-icon class="drag-handle">drag_indicator</mat-icon>
         <h2>{{ section.title }}</h2>
       </div>
       <ng-container *ngIf="!sectionsCollapsed">
