@@ -10,14 +10,6 @@
     cursor: grabbing;
   }
 
-  &.no-drag {
-    cursor: default;
-
-    &:active {
-      cursor: default;
-    }
-  }
-
   h2 {
     flex: 1;
     margin: 0;

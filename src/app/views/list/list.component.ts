@@ -18,7 +18,7 @@ import {
   DialogAddGroupComponent,
 } from './dialog-add-group/dialog-add-group.component';
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
-import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
+import { ListService } from './list.service';
 import { DRAG_START_DELAY } from '../drag-config';
 
 export function formatSharedWith(emails: string[]): string {
@@ -166,18 +166,12 @@ export class ListComponent implements OnInit {
     }
   }
 
-  isUngroupedSection(title: string): boolean {
-    return title === UNGROUPED_SECTION_TITLE;
-  }
-
   dropTrash(event: CdkDragDrop<any>): void {
     this.markRecentlyDropped();
     const dragData = event.item.data;
     if (!this.list) return;
 
     if (dragData?.type === 'section') {
-      const section = this.list.sections.find((s) => s.id === dragData.id);
-      if (section && this.isUngroupedSection(section.title)) return;
       const obs = this.isShared
         ? this.listService.removeSharedSectionFromList(this.list.id, dragData.id)
         : this.listService.removeSectionFromList(this.list.id, dragData.id);
