@@ -186,6 +186,28 @@ export class ListService {
     );
   }
 
+  /*
+    `update` rather than `set`, so the section keeps its items and its
+    sourceGroupId. The id is the Firebase key and is untouched by a rename.
+   */
+  renameSection(
+    listId: string,
+    sectionId: string,
+    title: string
+  ): Observable<void> {
+    return this.userPath().pipe(
+      take(1),
+      switchMap((path) => {
+        if (!path) return of(undefined as void);
+        return from(
+          this.db
+            .object(`${path}/lists/${listId}/sections/${sectionId}`)
+            .update({ title })
+        );
+      })
+    );
+  }
+
   getSharedList(id: string): Observable<List | undefined> {
     return this.db
       .object(`sharedLists/${id}`)
@@ -215,6 +237,22 @@ export class ListService {
       this.db
         .object(`sharedLists/${listId}/sections/${sectionId}`)
         .update({ items })
+    );
+  }
+
+  /*
+    No take(1): the shared node is addressed by list id alone, so this never
+    reads the long-lived user$ stream.
+   */
+  renameSharedSection(
+    listId: string,
+    sectionId: string,
+    title: string
+  ): Observable<void> {
+    return from(
+      this.db
+        .object(`sharedLists/${listId}/sections/${sectionId}`)
+        .update({ title })
     );
   }
 

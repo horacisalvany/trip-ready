@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { AngularFireDatabase } from '@angular/fire/compat/database';
-import { of } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
 import { ListService } from './list.service';
 import { AuthService } from '../../services/auth.service';
 
@@ -172,6 +172,57 @@ describe('ListService', () => {
         expect(key).toBe('newSectionKey');
         done();
       });
+    });
+  });
+
+  describe('renameSection', () => {
+    it('should update the title under the user lists path', (done) => {
+      mockDbObject.update.and.returnValue(Promise.resolve());
+
+      service.renameSection('l1', 'sec1', 'Beach gear').subscribe(() => {
+        expect(mockDb.object).toHaveBeenCalledWith(
+          'users/testUid/lists/l1/sections/sec1'
+        );
+        expect(mockDbObject.update).toHaveBeenCalledWith({ title: 'Beach gear' });
+        done();
+      });
+    });
+
+    /*
+      The write rule in CLAUDE.md. user$ is long lived, so a rename left
+      subscribed would be replayed under the next user's path the moment someone
+      else logs in, renaming a section in their account.
+     */
+    it('should write once even when the auth user changes afterwards', () => {
+      const user$ = new BehaviorSubject<{ uid: string } | null>({ uid: 'testUid' });
+      const isolatedService = new ListService(mockDb, { user$ } as any);
+      mockDbObject.update.and.returnValue(Promise.resolve());
+
+      isolatedService.renameSection('l1', 'sec1', 'Beach gear').subscribe();
+      user$.next({ uid: 'otherUid' });
+
+      expect(mockDbObject.update).toHaveBeenCalledTimes(1);
+      expect(mockDb.object).not.toHaveBeenCalledWith(
+        'users/otherUid/lists/l1/sections/sec1'
+      );
+    });
+  });
+
+  describe('renameSharedSection', () => {
+    it('should update the title at the sharedLists path', (done) => {
+      mockDbObject.update.and.returnValue(Promise.resolve());
+
+      service
+        .renameSharedSection('sharedId1', 'sec1', 'Beach gear')
+        .subscribe(() => {
+          expect(mockDb.object).toHaveBeenCalledWith(
+            'sharedLists/sharedId1/sections/sec1'
+          );
+          expect(mockDbObject.update).toHaveBeenCalledWith({
+            title: 'Beach gear',
+          });
+          done();
+        });
     });
   });
 

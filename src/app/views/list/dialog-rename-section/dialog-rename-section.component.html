@@ -1,0 +1,25 @@
+<h2 mat-dialog-title>Rename section</h2>
+<mat-dialog-content>
+  <!--
+    A plain input rather than a mat-form-field: the outline appearance draws its
+    border straight through the floating label here, and this matches the field
+    the add-sections dialog already uses to name a section.
+  -->
+  <input
+    cdkFocusInitial
+    class="section-title"
+    [(ngModel)]="title"
+    type="text"
+    maxlength="40"
+    placeholder="Ex. Beach gear"
+    aria-label="Section name"
+    (keyup.enter)="onRename()"
+  />
+  <p class="error-message" *ngIf="errorMessage">{{ errorMessage }}</p>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" class="rename" (click)="onRename()">
+    Rename
+  </button>
+</mat-dialog-actions>

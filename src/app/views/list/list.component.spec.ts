@@ -7,7 +7,11 @@ import { MatTooltipModule, MatTooltip } from '@angular/material/tooltip';
 import { CdkDrag, CdkDropList, DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { ActivatedRoute } from '@angular/router';
 import { of, Subject } from 'rxjs';
-import { ListComponent, formatSharedWith } from './list.component';
+import {
+  ListComponent,
+  TAP_MOVE_TOLERANCE_PX,
+  formatSharedWith,
+} from './list.component';
 import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
 import { AddSectionsResult } from './dialog-add-group/dialog-add-group.component';
@@ -59,9 +63,11 @@ describe('ListComponent', () => {
       'addEmptySectionToList',
       'removeSectionFromList',
       'updateSectionItems',
+      'renameSection',
       'addSharedSectionToList',
       'addEmptySharedSectionToList',
       'updateSharedSectionItems',
+      'renameSharedSection',
     ]);
     mockListService.getList.and.returnValue(
       of({
@@ -73,10 +79,12 @@ describe('ListComponent', () => {
     mockListService.addEmptySectionToList.and.returnValue(of('newSectionId'));
     mockListService.removeSectionFromList.and.returnValue(of(undefined));
     mockListService.updateSectionItems.and.returnValue(of(undefined));
+    mockListService.renameSection.and.returnValue(of(undefined));
     mockListService.getSharedList.and.returnValue(of({...MOCK_LIST, isShared: true, sections: MOCK_LIST.sections.map(s => ({...s, items: [...s.items]}))}));
     mockListService.addSharedSectionToList.and.returnValue(of('newSectionId'));
     mockListService.addEmptySharedSectionToList.and.returnValue(of('newSectionId'));
     mockListService.updateSharedSectionItems.and.returnValue(of(undefined));
+    mockListService.renameSharedSection.and.returnValue(of(undefined));
 
     mockGroupService = jasmine.createSpyObj('GroupService', ['getGroups']);
     mockGroupService.getGroups.and.returnValue(
@@ -895,7 +903,7 @@ describe('ListComponent', () => {
       clickToggle();
 
       const titles = sectionHeaders().map((el) =>
-        el.query(By.css('h2')).nativeElement.textContent.trim()
+        el.query(By.css('.section-title-text')).nativeElement.textContent.trim()
       );
       expect(titles).toEqual([UNGROUPED_SECTION_TITLE, 'Packing', 'Electronics']);
     });
@@ -921,6 +929,190 @@ describe('ListComponent', () => {
 
       expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
       expect(mockListService.updateSharedSectionItems).not.toHaveBeenCalled();
+    });
+  });
+
+  // --- renaming a section (F05) ---
+
+  describe('renaming a section', () => {
+    function titleOf(sectionTitle: string) {
+      return fixture.debugElement
+        .queryAll(By.css('.section-header h2'))
+        .find(
+          (el) =>
+            el.query(By.css('.section-title-text')).nativeElement.textContent.trim() ===
+            sectionTitle
+        )!;
+    }
+
+    function stubDialog(closesWith: string | undefined) {
+      const dialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
+      dialogRef.afterClosed.and.returnValue(of(closesWith));
+      return spyOn(component.dialog, 'open').and.returnValue(dialogRef);
+    }
+
+    /*
+      A click carries only the position it was released at, so the press has to
+      be recorded first. Same coordinates means the pointer never moved: a tap.
+     */
+    function pressAndClick(sectionTitle: string, movedBy = 0): void {
+      const title = titleOf(sectionTitle);
+      title.triggerEventHandler('mousedown', { clientX: 100, clientY: 100 });
+      title.triggerEventHandler('click', {
+        clientX: 100 + movedBy,
+        clientY: 100,
+      });
+    }
+
+    it('should show a rename hint on every section', () => {
+      const hintOwners = fixture.debugElement
+        .queryAll(By.css('.section-header h2'))
+        .filter((el) => el.query(By.css('.rename-hint')))
+        .map((el) => el.query(By.css('.section-title-text')).nativeElement.textContent.trim());
+
+      expect(hintOwners).toEqual([UNGROUPED_SECTION_TITLE, 'Packing', 'Electronics']);
+    });
+
+    /*
+      The pill is the tap target, not the glyph, so it has to announce itself as
+      a control.
+     */
+    it('should expose a title as a keyboard-reachable button', () => {
+      const title = titleOf('Packing').nativeElement as HTMLElement;
+
+      expect(title.getAttribute('role')).toBe('button');
+      expect(title.getAttribute('tabindex')).toBe('0');
+      expect(title.getAttribute('aria-label')).toBe('Rename section Packing');
+    });
+
+    it('should open the dialog prefilled with the current title when tapped', () => {
+      const open = stubDialog(undefined);
+
+      pressAndClick('Packing');
+
+      expect(open).toHaveBeenCalledWith(
+        jasmine.anything(),
+        jasmine.objectContaining({ data: { title: 'Packing' } })
+      );
+    });
+
+    it('should rename the section with the title the dialog returns', () => {
+      stubDialog('Hand luggage');
+
+      pressAndClick('Packing');
+
+      expect(mockListService.renameSection).toHaveBeenCalledWith(
+        'list1',
+        's1',
+        'Hand luggage'
+      );
+    });
+
+    it('should write nothing when the dialog is dismissed', () => {
+      stubDialog(undefined);
+
+      pressAndClick('Packing');
+
+      expect(mockListService.renameSection).not.toHaveBeenCalled();
+    });
+
+    it('should not touch any other section', () => {
+      stubDialog('Hand luggage');
+
+      pressAndClick('Packing');
+
+      expect(mockListService.renameSection).toHaveBeenCalledTimes(1);
+      expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
+      expect(mockListService.removeSectionFromList).not.toHaveBeenCalled();
+    });
+
+    /*
+      Ungrouped is an ordinary section since it became deletable, so it renames
+      like the rest rather than being singled out.
+     */
+    it('should rename the Ungrouped section like any other', () => {
+      stubDialog('Odds and ends');
+
+      pressAndClick(UNGROUPED_SECTION_TITLE);
+
+      expect(mockListService.renameSection).toHaveBeenCalledWith(
+        'list1',
+        'ungrouped',
+        'Odds and ends'
+      );
+    });
+
+    it('should not open the dialog when the list is undefined', () => {
+      const open = stubDialog('Hand luggage');
+      component.list = undefined;
+
+      component.openRenameDialog(MOCK_SECTIONS[1]);
+
+      expect(open).not.toHaveBeenCalled();
+    });
+
+    /*
+      CDK does not suppress the click that follows a mouse drag, so without the
+      movement check a section dragged a few pixels — or all the way to the
+      trash — would also open the rename dialog on release.
+     */
+    it('should ignore a click that ends away from where the press began', () => {
+      const open = stubDialog('Hand luggage');
+
+      pressAndClick('Packing', TAP_MOVE_TOLERANCE_PX + 1);
+
+      expect(open).not.toHaveBeenCalled();
+      expect(mockListService.renameSection).not.toHaveBeenCalled();
+    });
+
+    it('should still rename when the pointer only wobbled within the tolerance', () => {
+      stubDialog('Hand luggage');
+
+      pressAndClick('Packing', TAP_MOVE_TOLERANCE_PX);
+
+      expect(mockListService.renameSection).toHaveBeenCalled();
+    });
+
+    /*
+      The recorded press is consumed by the click it belongs to. Otherwise it
+      would keep vouching for clicks that follow, including the one at the end of
+      a later drag.
+     */
+    it('should require its own press for every click', () => {
+      const open = stubDialog('Hand luggage');
+      const title = titleOf('Packing');
+
+      title.triggerEventHandler('mousedown', { clientX: 100, clientY: 100 });
+      title.triggerEventHandler('click', { clientX: 100, clientY: 100 });
+      title.triggerEventHandler('click', { clientX: 400, clientY: 400 });
+
+      expect(open).toHaveBeenCalledTimes(1);
+    });
+
+    it('should rename via the keyboard without any press recorded', () => {
+      stubDialog('Hand luggage');
+
+      titleOf('Packing').triggerEventHandler('keyup.enter', {});
+
+      expect(mockListService.renameSection).toHaveBeenCalledWith(
+        'list1',
+        's1',
+        'Hand luggage'
+      );
+    });
+
+    it('should rename on the shared node when the list is shared', () => {
+      component.isShared = true;
+      stubDialog('Hand luggage');
+
+      pressAndClick('Packing');
+
+      expect(mockListService.renameSharedSection).toHaveBeenCalledWith(
+        'list1',
+        's1',
+        'Hand luggage'
+      );
+      expect(mockListService.renameSection).not.toHaveBeenCalled();
     });
   });
 });
