@@ -62,6 +62,21 @@ describe('DialogRenameSectionComponent', () => {
   });
 
   /*
+    A mat-form-field with the outline appearance drew its border straight through
+    the floating label, so the field is a plain input like the one the
+    add-sections dialog uses. Named for screen readers instead of by a label.
+   */
+  it('should name the field for assistive technology', () => {
+    render();
+    const input: HTMLInputElement = fixture.debugElement.query(
+      By.css('.section-title')
+    ).nativeElement;
+
+    expect(input.getAttribute('aria-label')).toBe('Section name');
+    expect(fixture.debugElement.query(By.css('mat-form-field'))).toBeNull();
+  });
+
+  /*
     Same cap as the add-section field, so a title cannot be renamed into
     something longer than one that could have been created.
    */

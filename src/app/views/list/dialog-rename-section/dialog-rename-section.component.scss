@@ -1,13 +1,25 @@
 /*
   The whole point of renaming in a dialog rather than in the card is that a
-  40-character title gets the full width to be edited in.
+  40-character title gets the full width to be edited in. Styled like the
+  add-sections dialog's title field so the two feel like the same control.
  */
-.full-width {
+.section-title {
   width: 100%;
+  box-sizing: border-box;
+  border: none;
+  border-bottom: 1px solid #cbd5e1;
+  outline: none;
+  padding: 4px 8px;
+  font-size: 16px;
+
+  &:focus {
+    border-bottom-color: #3f51b5;
+  }
 }
 
 .error-message {
   color: #f44336;
   font-size: 12px;
-  margin-top: -8px;
+  margin-top: 8px;
+  margin-bottom: 0;
 }
