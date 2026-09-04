@@ -61,7 +61,24 @@
     >
       <div class="section-header" [class.no-drag]="isUngroupedSection(section.title)" cdkDragHandle>
         <mat-icon *ngIf="!isUngroupedSection(section.title)" class="drag-handle">drag_indicator</mat-icon>
-        <h2>{{ section.title }}</h2>
+        <!--
+          The pencil lives inside the h2, in the text flow, so it wraps with the
+          last word instead of claiming a column of its own: on a phone the card
+          is ~181px wide and an icon button would cost 15% of it. The tap target
+          is the whole pill, and the glyph is only the hint that says so.
+        -->
+        <h2
+          [class.renameable]="isRenameable(section)"
+          [attr.role]="isRenameable(section) ? 'button' : null"
+          [attr.tabindex]="isRenameable(section) ? 0 : null"
+          [attr.aria-label]="isRenameable(section) ? renameLabel(section) : null"
+          (mousedown)="onTitlePressStart($event)"
+          (click)="openRenameDialog(section, $event)"
+          (keyup.enter)="openRenameDialog(section)"
+        >
+          <span class="section-title-text">{{ section.title }}</span>
+          <mat-icon *ngIf="isRenameable(section)" class="rename-hint">edit</mat-icon>
+        </h2>
       </div>
       <ng-container *ngIf="!sectionsCollapsed">
         <mat-list

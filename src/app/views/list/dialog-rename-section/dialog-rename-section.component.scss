@@ -1,0 +1,13 @@
+/*
+  The whole point of renaming in a dialog rather than in the card is that a
+  40-character title gets the full width to be edited in.
+ */
+.full-width {
+  width: 100%;
+}
+
+.error-message {
+  color: #f44336;
+  font-size: 12px;
+  margin-top: -8px;
+}
