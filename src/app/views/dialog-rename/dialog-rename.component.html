@@ -1,4 +1,4 @@
-<h2 mat-dialog-title>Rename section</h2>
+<h2 mat-dialog-title>{{ heading }}</h2>
 <mat-dialog-content>
   <!--
     A plain input rather than a mat-form-field: the outline appearance draws its
@@ -7,12 +7,12 @@
   -->
   <input
     cdkFocusInitial
-    class="section-title"
+    class="rename-title"
     [(ngModel)]="title"
     type="text"
     maxlength="40"
     placeholder="Ex. Beach gear"
-    aria-label="Section name"
+    [attr.aria-label]="fieldLabel"
     (keyup.enter)="onRename()"
   />
   <p class="error-message" *ngIf="errorMessage">{{ errorMessage }}</p>

@@ -1,0 +1,36 @@
+/*
+  The faint pencil that marks a title as tappable — section titles on a list
+  (F05), group titles on the groups view (F06). $header is the class of the
+  draggable header the title lives in, so the glyph can brighten on hover.
+ */
+@mixin rename-hint($header) {
+  /*
+    Sized and aligned to sit in the middle of the title text rather than tower
+    over it: mat-icon defaults to 24px, which is taller than the 16px h2 line.
+   */
+  .rename-hint {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    vertical-align: -1px;
+    opacity: 0.35;
+    transition: opacity 150ms ease;
+
+    #{$header}:hover & {
+      opacity: 0.8;
+    }
+  }
+
+  #{$header} h2 {
+    cursor: pointer;
+
+    /*
+      CDK clears the native tap highlight on the whole card while a drag handle
+      is present, so without this the pill gives no feedback at all on a phone
+      and the tap feels dead.
+     */
+    &:active .rename-hint {
+      opacity: 1;
+    }
+  }
+}

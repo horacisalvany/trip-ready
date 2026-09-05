@@ -57,6 +57,20 @@ export class GroupService {
     );
   }
 
+  /*
+    `update` with the title alone rather than `set`, so the group keeps its items.
+    The id is the Firebase key and is untouched by a rename.
+   */
+  renameGroup(id: string, title: string): Observable<void> {
+    return this.userPath().pipe(
+      take(1),
+      switchMap((path) => {
+        if (!path) return of(undefined as void);
+        return from(this.db.list(`${path}/groups`).update(id, { title }));
+      })
+    );
+  }
+
   addGroup(title: string, items: string[] = []): Observable<string | null> {
     return this.userPath().pipe(
       take(1),

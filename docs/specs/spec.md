@@ -19,6 +19,7 @@ This document describes the expected behavior of the application. It is the sour
 Groups are reusable templates of items that can be added to lists as sections.
 
 - A user can create a group with a title and zero or more items.
+- A user can rename a group by tapping its title, which opens a dialog with the current title pre-filled. A faint pencil glyph inside the title marks it as editable. The dialog rejects a blank title with an error and stays open. A title equal to the current one closes without writing. Titles are capped at 40 characters and duplicates are allowed, as they are when a group is created. The group keeps its id and its items, and no other group is touched. Renaming a group does not change the sections already created from it on any list.
 - A user can add items to a group.
 - A user can delete a group via drag-and-drop to the trash.
 - Groups are private to the user who created them.

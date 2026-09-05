@@ -44,6 +44,8 @@ firebase-debug.log
 # System files
 .DS_Store
 Thumbs.db
+# Headless Chrome drops its cache here when Karma runs (literal directory name)
+${local_app_data}*
 
 # Recorded data
 # package-lock.json

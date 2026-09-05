@@ -17,18 +17,15 @@ import {
   AddSectionsResult,
   DialogAddGroupComponent,
 } from './dialog-add-group/dialog-add-group.component';
-import { DialogRenameSectionComponent } from './dialog-rename-section/dialog-rename-section.component';
+import {
+  DialogRenameComponent,
+  RenameDialogData,
+} from '../dialog-rename/dialog-rename.component';
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
 import { ListService } from './list.service';
 import { Section } from './section';
 import { DRAG_START_DELAY } from '../drag-config';
-
-/*
-  How far the pointer may travel between pressing a section title and releasing
-  it and still count as a tap. Same 5px CDK uses to decide a drag has begun, so
-  a gesture is either a tap or a drag, never both.
- */
-export const TAP_MOVE_TOLERANCE_PX = 5;
+import { TapGuard } from '../tap-guard';
 
 export function formatSharedWith(emails: string[]): string {
   if (emails.length === 0) return '';
@@ -61,10 +58,9 @@ export class ListComponent implements OnInit {
    */
   private recentlyDropped = false;
   /*
-    Where the mouse went down on a section title, so a click that ends far from
-    it can be recognised as the tail of a drag and ignored.
+    Tells a tap on a section title from the click that ends a drag of its header.
    */
-  private titlePressAt: { x: number; y: number } | null = null;
+  private readonly titleTap = new TapGuard();
 
   constructor(
     private route: ActivatedRoute,
@@ -185,37 +181,22 @@ export class ListComponent implements OnInit {
   }
 
   onTitlePressStart(event: MouseEvent): void {
-    this.titlePressAt = { x: event.clientX, y: event.clientY };
+    this.titleTap.press(event);
   }
 
   /*
-    A click is only a tap if the pointer barely moved since it went down. CDK
-    does not suppress the click that follows a mouse drag, so without this a
-    short drag of a section header would also open the rename dialog.
-
-    Deliberately derived from the event rather than from a flag toggled by
-    cdkDragStarted/cdkDragEnded: a section dropped on the trash can be gone from
-    the DOM before cdkDragEnded fires, which would leave such a flag stuck on
-    and silently break renaming from then on.
+    Opens on a tap of the title, but not on the click that ends a drag of the
+    section header — see `TapGuard`. Called without an event from the keyboard,
+    which is always a tap.
    */
   openRenameDialog(section: Section, event?: MouseEvent): void {
     if (!this.list) return;
+    if (!this.titleTap.isTap(event)) return;
 
-    const pressedAt = this.titlePressAt;
-    this.titlePressAt = null;
-    if (event) {
-      // A pointer click always follows a press on the title. One that does not
-      // cannot be vouched for, so it is not treated as a tap.
-      if (!pressedAt) return;
-      const moved =
-        Math.abs(event.clientX - pressedAt.x) +
-        Math.abs(event.clientY - pressedAt.y);
-      if (moved > TAP_MOVE_TOLERANCE_PX) return;
-    }
-
-    const dialogRef = this.dialog.open(DialogRenameSectionComponent, {
+    const data: RenameDialogData = { entity: 'section', title: section.title };
+    const dialogRef = this.dialog.open(DialogRenameComponent, {
       width: '300px',
-      data: { title: section.title },
+      data,
     });
 
     dialogRef.afterClosed().subscribe((title: string | undefined) => {

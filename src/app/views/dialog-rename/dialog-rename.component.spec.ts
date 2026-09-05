@@ -2,39 +2,48 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { UNGROUPED_SECTION_TITLE } from '../list.service';
+import { UNGROUPED_SECTION_TITLE } from '../list/list.service';
 import {
-  BLANK_TITLE_ERROR,
-  DialogRenameSectionComponent,
-} from './dialog-rename-section.component';
+  blankTitleError,
+  DialogRenameComponent,
+  RenameDialogData,
+} from './dialog-rename.component';
 
-describe('DialogRenameSectionComponent', () => {
-  let component: DialogRenameSectionComponent;
-  let fixture: ComponentFixture<DialogRenameSectionComponent>;
-  let dialogRef: jasmine.SpyObj<MatDialogRef<DialogRenameSectionComponent>>;
-  let dialogData: { title: string };
+describe('DialogRenameComponent', () => {
+  let component: DialogRenameComponent;
+  let fixture: ComponentFixture<DialogRenameComponent>;
+  let dialogRef: jasmine.SpyObj<MatDialogRef<DialogRenameComponent>>;
+  let dialogData: RenameDialogData;
 
   /*
     The component reads its title in the constructor, so tests that need a
-    different starting title fill `dialogData` before rendering.
+    different starting title or entity fill `dialogData` before rendering.
    */
   function render(): void {
-    fixture = TestBed.createComponent(DialogRenameSectionComponent);
+    fixture = TestBed.createComponent(DialogRenameComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   }
 
+  function textOf(selector: string): string | null {
+    const element = fixture.debugElement.query(By.css(selector));
+    return element ? element.nativeElement.textContent.trim() : null;
+  }
+
+  function input(): HTMLInputElement {
+    return fixture.debugElement.query(By.css('.rename-title')).nativeElement;
+  }
+
   function errorText(): string | null {
-    const error = fixture.debugElement.query(By.css('.error-message'));
-    return error ? error.nativeElement.textContent.trim() : null;
+    return textOf('.error-message');
   }
 
   beforeEach(async () => {
-    dialogData = { title: 'Electronics' };
+    dialogData = { entity: 'section', title: 'Electronics' };
     dialogRef = jasmine.createSpyObj('MatDialogRef', ['close']);
 
     await TestBed.configureTestingModule({
-      imports: [DialogRenameSectionComponent, NoopAnimationsModule],
+      imports: [DialogRenameComponent, NoopAnimationsModule],
       providers: [
         { provide: MatDialogRef, useValue: dialogRef },
         { provide: MAT_DIALOG_DATA, useValue: dialogData },
@@ -52,40 +61,52 @@ describe('DialogRenameSectionComponent', () => {
     render();
     // ngModel writes the value to the input on a microtask, not during render.
     await fixture.whenStable();
-    const input: HTMLInputElement = fixture.debugElement.query(
-      By.css('.section-title')
-    ).nativeElement;
 
     expect(component.title).toBe('Electronics');
-    expect(input.value).toBe('Electronics');
+    expect(input().value).toBe('Electronics');
+  });
+
+  /*
+    The dialog is shared by sections and groups, and the entity it was opened for
+    is the only thing that changes on screen.
+   */
+  describe('naming the thing being renamed', () => {
+    it('should name a section', () => {
+      render();
+
+      expect(textOf('[mat-dialog-title]')).toBe('Rename section');
+      expect(input().getAttribute('aria-label')).toBe('Section name');
+    });
+
+    it('should name a group', () => {
+      dialogData.entity = 'group';
+
+      render();
+
+      expect(textOf('[mat-dialog-title]')).toBe('Rename group');
+      expect(input().getAttribute('aria-label')).toBe('Group name');
+    });
   });
 
   /*
     A mat-form-field with the outline appearance drew its border straight through
-    the floating label, so the field is a plain input like the one the
-    add-sections dialog uses. Named for screen readers instead of by a label.
+    the floating label, so the field is a plain input like the ones the add
+    dialogs use. Named for screen readers instead of by a label.
    */
-  it('should name the field for assistive technology', () => {
+  it('should not use a mat-form-field', () => {
     render();
-    const input: HTMLInputElement = fixture.debugElement.query(
-      By.css('.section-title')
-    ).nativeElement;
 
-    expect(input.getAttribute('aria-label')).toBe('Section name');
     expect(fixture.debugElement.query(By.css('mat-form-field'))).toBeNull();
   });
 
   /*
-    Same cap as the add-section field, so a title cannot be renamed into
-    something longer than one that could have been created.
+    Same cap as the add-section and add-item fields, so a title cannot be renamed
+    into something longer than one that could have been created.
    */
   it('should cap the title at 40 characters', () => {
     render();
-    const input: HTMLInputElement = fixture.debugElement.query(
-      By.css('.section-title')
-    ).nativeElement;
 
-    expect(input.maxLength).toBe(40);
+    expect(input().maxLength).toBe(40);
   });
 
   it('should close with the trimmed new title', () => {
@@ -130,7 +151,7 @@ describe('DialogRenameSectionComponent', () => {
 
   // --- validation ---
 
-  it('should reject a blank title and stay open', () => {
+  it('should reject a blank section title and stay open', () => {
     render();
     component.title = '   ';
 
@@ -138,7 +159,19 @@ describe('DialogRenameSectionComponent', () => {
     fixture.detectChanges();
 
     expect(dialogRef.close).not.toHaveBeenCalled();
-    expect(errorText()).toBe(BLANK_TITLE_ERROR);
+    expect(errorText()).toBe(blankTitleError('section'));
+  });
+
+  it('should name the entity in the error of a blank group title', () => {
+    dialogData.entity = 'group';
+    render();
+    component.title = '';
+
+    component.onRename();
+    fixture.detectChanges();
+
+    expect(dialogRef.close).not.toHaveBeenCalled();
+    expect(errorText()).toBe('Please enter a group name');
   });
 
   /*
@@ -165,9 +198,10 @@ describe('DialogRenameSectionComponent', () => {
   it('should rename when the field is submitted with Enter', () => {
     render();
     component.title = 'Beach gear';
-    const input = fixture.debugElement.query(By.css('.section-title'));
 
-    input.triggerEventHandler('keyup.enter', {});
+    fixture.debugElement
+      .query(By.css('.rename-title'))
+      .triggerEventHandler('keyup.enter', {});
 
     expect(dialogRef.close).toHaveBeenCalledWith('Beach gear');
   });
