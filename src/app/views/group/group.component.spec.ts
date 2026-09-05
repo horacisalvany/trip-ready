@@ -7,7 +7,9 @@ import { of } from 'rxjs';
 import { GroupComponent } from './group.component';
 import { GroupService } from './group.service';
 import { Group } from './group';
+import { DialogRenameComponent } from '../dialog-rename/dialog-rename.component';
 import { expectAllDragsHaveStartDelay } from '../drag-config.spec-helper';
+import { TAP_MOVE_TOLERANCE_PX } from '../tap-guard';
 
 const MOCK_GROUPS: Group[] = [
   { id: 'g1', title: 'Packing', items: ['Passport', 'Tickets'] },
@@ -26,6 +28,7 @@ describe('GroupComponent', () => {
       'updateGroup',
       'addGroup',
       'deleteGroup',
+      'renameGroup',
     ]);
     mockGroupService.getGroups.and.returnValue(
       of(MOCK_GROUPS.map((g) => ({ ...g, items: [...g.items] })))
@@ -33,6 +36,7 @@ describe('GroupComponent', () => {
     mockGroupService.updateGroup.and.returnValue(of(undefined));
     mockGroupService.addGroup.and.returnValue(of('newKey'));
     mockGroupService.deleteGroup.and.returnValue(of(undefined));
+    mockGroupService.renameGroup.and.returnValue(of(undefined));
 
     mockDialog = jasmine.createSpyObj('MatDialog', ['open']);
 
@@ -314,6 +318,168 @@ describe('GroupComponent', () => {
 
     expect(mockDialog.open).toHaveBeenCalled();
     expect(mockGroupService.addGroup).not.toHaveBeenCalled();
+  });
+
+  // --- renaming a group (F06) ---
+
+  describe('renaming a group', () => {
+    function titleOf(groupTitle: string) {
+      return fixture.debugElement
+        .queryAll(By.css('.group-header h2'))
+        .find(
+          (el) =>
+            el
+              .query(By.css('.group-title-text'))
+              .nativeElement.textContent.trim() === groupTitle
+        )!;
+    }
+
+    function stubDialog(closesWith: string | undefined): void {
+      mockDialog.open.and.returnValue({
+        afterClosed: () => of(closesWith),
+      } as MatDialogRef<any>);
+    }
+
+    /*
+      A click carries only the position it was released at, so the press has to
+      be recorded first. Same coordinates means the pointer never moved: a tap.
+     */
+    function pressAndClick(groupTitle: string, movedBy = 0): void {
+      const title = titleOf(groupTitle);
+      title.triggerEventHandler('mousedown', { clientX: 100, clientY: 100 });
+      title.triggerEventHandler('click', {
+        clientX: 100 + movedBy,
+        clientY: 100,
+      });
+    }
+
+    it('should show a rename hint on every group', () => {
+      const hintOwners = fixture.debugElement
+        .queryAll(By.css('.group-header h2'))
+        .filter((el) => el.query(By.css('.rename-hint')))
+        .map((el) =>
+          el.query(By.css('.group-title-text')).nativeElement.textContent.trim()
+        );
+
+      expect(hintOwners).toEqual(['Packing', 'Documents']);
+    });
+
+    /*
+      The pill is the tap target, not the glyph, so it has to announce itself as
+      a control.
+     */
+    it('should expose a title as a keyboard-reachable button', () => {
+      const title = titleOf('Packing').nativeElement as HTMLElement;
+
+      expect(title.getAttribute('role')).toBe('button');
+      expect(title.getAttribute('tabindex')).toBe('0');
+      expect(title.getAttribute('aria-label')).toBe('Rename group Packing');
+    });
+
+    it('should open the shared rename dialog prefilled with the current title', () => {
+      stubDialog(undefined);
+
+      pressAndClick('Packing');
+
+      expect(mockDialog.open).toHaveBeenCalledWith(
+        DialogRenameComponent,
+        jasmine.objectContaining({
+          data: { entity: 'group', title: 'Packing' },
+        })
+      );
+    });
+
+    it('should rename the group with the title the dialog returns', () => {
+      stubDialog('Hand luggage');
+
+      pressAndClick('Packing');
+
+      expect(mockGroupService.renameGroup).toHaveBeenCalledWith(
+        'g1',
+        'Hand luggage'
+      );
+    });
+
+    it('should write nothing when the dialog is dismissed', () => {
+      stubDialog(undefined);
+
+      pressAndClick('Packing');
+
+      expect(mockGroupService.renameGroup).not.toHaveBeenCalled();
+    });
+
+    it('should rename the group that was tapped and no other', () => {
+      stubDialog('Papers');
+
+      pressAndClick('Documents');
+
+      expect(mockGroupService.renameGroup).toHaveBeenCalledOnceWith(
+        'g2',
+        'Papers'
+      );
+    });
+
+    /*
+      The rename must not disturb the items: they are never rewritten, the view
+      refreshes from the live groups stream.
+     */
+    it('should keep the items of the renamed group untouched', () => {
+      stubDialog('Hand luggage');
+
+      pressAndClick('Packing');
+
+      expect(mockGroupService.updateGroup).not.toHaveBeenCalled();
+      expect(component.groups[0].items).toEqual(['Passport', 'Tickets']);
+    });
+
+    /*
+      CDK does not suppress the click that follows a mouse drag, so without the
+      movement check a group dragged a few pixels — or all the way to the trash —
+      would also open the rename dialog on release.
+     */
+    it('should ignore a click that ends away from where the press began', () => {
+      stubDialog('Hand luggage');
+
+      pressAndClick('Packing', TAP_MOVE_TOLERANCE_PX + 1);
+
+      expect(mockDialog.open).not.toHaveBeenCalled();
+      expect(mockGroupService.renameGroup).not.toHaveBeenCalled();
+    });
+
+    it('should still rename when the pointer only wobbled within the tolerance', () => {
+      stubDialog('Hand luggage');
+
+      pressAndClick('Packing', TAP_MOVE_TOLERANCE_PX);
+
+      expect(mockGroupService.renameGroup).toHaveBeenCalled();
+    });
+
+    /*
+      The recorded press is consumed by the click it belongs to. Otherwise it
+      would keep vouching for clicks that follow, including the one at the end of
+      a later drag.
+     */
+    it('should require its own press for every click', () => {
+      stubDialog('Hand luggage');
+      const title = titleOf('Packing');
+
+      title.triggerEventHandler('mousedown', { clientX: 100, clientY: 100 });
+      title.triggerEventHandler('click', { clientX: 100, clientY: 100 });
+      title.triggerEventHandler('click', { clientX: 400, clientY: 400 });
+
+      expect(mockDialog.open).toHaveBeenCalledTimes(1);
+    });
+
+    it('should rename via the keyboard without any press recorded', () => {
+      stubDialog('Hand luggage');
+
+      titleOf('Packing').triggerEventHandler('keyup.enter', {});
+
+      expect(mockGroupService.renameGroup).toHaveBeenCalledWith(
+        'g1',
+        'Hand luggage'
+      );
+    });
   });
 
   // --- touch drag delay (mobile scrolling) ---

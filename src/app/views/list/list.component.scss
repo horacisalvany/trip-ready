@@ -1,4 +1,5 @@
 @import "../shared-card";
+@import "../rename-hint";
 
 .section-header {
   display: flex;
@@ -13,35 +14,10 @@
   h2 {
     flex: 1;
     margin: 0;
-    cursor: pointer;
-
-    /*
-      CDK clears the native tap highlight on the whole card while a drag handle
-      is present, so without this the pill gives no feedback at all on a phone
-      and the tap feels dead.
-     */
-    &:active .rename-hint {
-      opacity: 1;
-    }
   }
 }
 
-/*
-  Sized and aligned to sit in the middle of the title text rather than tower over
-  it: mat-icon defaults to 24px, which is taller than the 16px h2 line.
- */
-.rename-hint {
-  font-size: 14px;
-  width: 14px;
-  height: 14px;
-  vertical-align: -1px;
-  opacity: 0.35;
-  transition: opacity 150ms ease;
-
-  .section-header:hover & {
-    opacity: 0.8;
-  }
-}
+@include rename-hint(".section-header");
 
 .shared-with-info {
   color: #9c27b0;

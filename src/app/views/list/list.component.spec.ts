@@ -7,13 +7,11 @@ import { MatTooltipModule, MatTooltip } from '@angular/material/tooltip';
 import { CdkDrag, CdkDropList, DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { ActivatedRoute } from '@angular/router';
 import { of, Subject } from 'rxjs';
-import {
-  ListComponent,
-  TAP_MOVE_TOLERANCE_PX,
-  formatSharedWith,
-} from './list.component';
+import { ListComponent, formatSharedWith } from './list.component';
+import { TAP_MOVE_TOLERANCE_PX } from '../tap-guard';
 import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
+import { DialogRenameComponent } from '../dialog-rename/dialog-rename.component';
 import { AddSectionsResult } from './dialog-add-group/dialog-add-group.component';
 import { GroupService } from '../group/group.service';
 import { AuthService } from '../../services/auth.service';
@@ -991,8 +989,10 @@ describe('ListComponent', () => {
       pressAndClick('Packing');
 
       expect(open).toHaveBeenCalledWith(
-        jasmine.anything(),
-        jasmine.objectContaining({ data: { title: 'Packing' } })
+        DialogRenameComponent,
+        jasmine.objectContaining({
+          data: { entity: 'section', title: 'Packing' },
+        })
       );
     });
 

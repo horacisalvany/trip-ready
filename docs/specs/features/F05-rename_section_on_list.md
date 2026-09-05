@@ -70,10 +70,12 @@ shares.
 
 ## Technical notes
 
-- `DialogRenameSectionComponent` (`dialog-rename-section/`) takes
-  `{ title }` and closes with the trimmed new title, or `undefined` on cancel.
-  Validation lives in the dialog and follows the share dialog's idiom: set
-  `errorMessage` and stay open.
+- The dialog takes `{ title }` and closes with the trimmed new title, or
+  `undefined` on cancel. Validation lives in the dialog and follows the share
+  dialog's idiom: set `errorMessage` and stay open. (Originally
+  `DialogRenameSectionComponent` in `dialog-rename-section/`; F06 generalised it
+  into the shared `DialogRenameComponent` in `views/dialog-rename/`, which takes
+  `{ entity, title }`.)
 - `ListService.renameSection(listId, sectionId, title)` updates
   `users/{uid}/lists/{listId}/sections/{sectionId}` with `take(1)`, per the write
   rule in `CLAUDE.md`. `renameSharedSection(...)` does the same under
@@ -101,12 +103,13 @@ on the move, which suppresses the click at the end of the gesture.
 
 That leaves one desktop-only gap: `preventDefault()` on `mousemove` does not
 suppress the following `click`, so a short mouse drag that starts and ends on the
-header would open the dialog. `ListComponent` records the pointer position on
+header would open the dialog. The component records the pointer position on
 `mousedown` on the title and ignores a click that lands more than
 `TAP_MOVE_TOLERANCE_PX` (5px, the same threshold CDK uses) from it. The check is
 stateless on purpose — a flag set on `cdkDragStarted` and cleared on
 `cdkDragEnded` would stay stuck if the section is removed from the DOM by the
-drop before `cdkDragEnded` fires, silently killing renames afterwards.
+drop before `cdkDragEnded` fires, silently killing renames afterwards. (F06 moved
+this into `TapGuard` in `views/tap-guard.ts`, shared with the groups view.)
 
 Collapsing sections is a toolbar button (F03), not a per-section gesture, so
 there is no other tap handler on the header to conflict with.
