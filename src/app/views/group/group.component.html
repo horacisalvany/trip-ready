@@ -8,6 +8,16 @@
   <div class="container">
     <div class="button-row">
       <h1>Groups</h1>
+      <button
+        (click)="toggleGroups()"
+        class="toggle-groups"
+        mat-icon-button
+        [title]="toggleGroupsLabel"
+        [attr.aria-label]="toggleGroupsLabel"
+        [attr.aria-expanded]="!groupsCollapsed"
+      >
+        <mat-icon>{{ toggleGroupsIcon }}</mat-icon>
+      </button>
       <button (click)="openDialogAddGroup()" mat-icon-button>
         <mat-icon>add</mat-icon>
       </button>
@@ -48,6 +58,7 @@
           </h2>
         </div>
         <mat-list
+          *ngIf="!groupsCollapsed"
           role="list"
           cdkDropList
           [cdkDropListData]="group.items"

@@ -482,6 +482,110 @@ describe('GroupComponent', () => {
     });
   });
 
+  // --- collapse / expand all groups (F07) ---
+
+  describe('collapse/expand all groups', () => {
+    function toggleButton() {
+      return fixture.debugElement.query(By.css('.toggle-groups'));
+    }
+
+    function toggleIconName(): string {
+      return toggleButton()
+        .query(By.css('mat-icon'))
+        .nativeElement.textContent.trim();
+    }
+
+    function groupItems() {
+      return fixture.debugElement.queryAll(By.css('mat-list-item'));
+    }
+
+    function addItemRows() {
+      return fixture.debugElement.queryAll(By.css('.add-item-row'));
+    }
+
+    function groupTitles(): string[] {
+      return fixture.debugElement
+        .queryAll(By.css('.group-header .group-title-text'))
+        .map((el) => el.nativeElement.textContent.trim());
+    }
+
+    function clickToggle(): void {
+      toggleButton().nativeElement.click();
+      fixture.detectChanges();
+    }
+
+    it('should start with the groups expanded', () => {
+      expect(component.groupsCollapsed).toBeFalse();
+      expect(groupItems().length).toBe(4);
+      expect(addItemRows().length).toBe(2);
+    });
+
+    it('should show the collapse icon while the groups are expanded', () => {
+      expect(toggleIconName()).toBe('unfold_less');
+    });
+
+    /*
+      The groups view has no share button, so "between share and add" (F07) means
+      immediately before the `+`.
+     */
+    it('should sit before the add button', () => {
+      const buttons = fixture.debugElement
+        .queryAll(By.css('.button-row button'))
+        .map((el) =>
+          el.query(By.css('mat-icon')).nativeElement.textContent.trim()
+        );
+
+      expect(buttons).toEqual(['unfold_less', 'add']);
+    });
+
+    it('should collapse every group when clicked while expanded', () => {
+      clickToggle();
+
+      expect(component.groupsCollapsed).toBeTrue();
+      expect(groupItems().length).toBe(0);
+      expect(addItemRows().length).toBe(0);
+    });
+
+    it('should keep the group titles visible while collapsed', () => {
+      clickToggle();
+
+      expect(groupTitles()).toEqual(['Packing', 'Documents']);
+    });
+
+    it('should show the expand icon while the groups are collapsed', () => {
+      clickToggle();
+
+      expect(toggleIconName()).toBe('unfold_more');
+    });
+
+    it('should expand every group when clicked while collapsed', () => {
+      clickToggle();
+      clickToggle();
+
+      expect(component.groupsCollapsed).toBeFalse();
+      expect(groupItems().length).toBe(4);
+      expect(addItemRows().length).toBe(2);
+      expect(toggleIconName()).toBe('unfold_less');
+    });
+
+    it('should not write the collapsed state to the backend', () => {
+      clickToggle();
+
+      expect(mockGroupService.updateGroup).not.toHaveBeenCalled();
+      expect(mockGroupService.renameGroup).not.toHaveBeenCalled();
+    });
+
+    /*
+      Collapsed group cards stay draggable to the trash, so only the item drags
+      disappear with the hidden lists.
+     */
+    it('should keep the group cards draggable while collapsed', () => {
+      clickToggle();
+
+      expect(fixture.debugElement.queryAll(By.css('.cdk-drag')).length).toBe(2);
+    });
+  });
+
   // --- touch drag delay (mobile scrolling) ---
 
   it('should apply the shared touch drag delay to every draggable', () => {

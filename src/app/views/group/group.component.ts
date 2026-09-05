@@ -23,6 +23,11 @@ import { TapGuard } from '../tap-guard';
 })
 export class GroupComponent implements OnInit {
   groups: Group[] = [];
+  /*
+    Purely a view preference, so it lives in the component and is not persisted:
+    reopening the groups view shows every group expanded again.
+   */
+  groupsCollapsed = false;
   readonly dragStartDelay = DRAG_START_DELAY;
   /*
     Boolean to control that something has been dropped. Without there are bugs like missclicks after you drop a list on the trash
@@ -131,6 +136,22 @@ export class GroupComponent implements OnInit {
     const group = this.groups[index];
     group.items.push(value);
     this.updateFirebase(group.id, group.items);
+  }
+
+  /*
+    The icon always shows the action, not the state: collapsed groups offer
+    "expand", expanded ones offer "collapse".
+   */
+  get toggleGroupsIcon(): string {
+    return this.groupsCollapsed ? 'unfold_more' : 'unfold_less';
+  }
+
+  get toggleGroupsLabel(): string {
+    return this.groupsCollapsed ? 'Expand all groups' : 'Collapse all groups';
+  }
+
+  toggleGroups(): void {
+    this.groupsCollapsed = !this.groupsCollapsed;
   }
 
   renameLabel(group: Group): string {

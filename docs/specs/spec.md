@@ -21,6 +21,7 @@ Groups are reusable templates of items that can be added to lists as sections.
 - A user can create a group with a title and zero or more items.
 - A user can rename a group by tapping its title, which opens a dialog with the current title pre-filled. A faint pencil glyph inside the title marks it as editable. The dialog rejects a blank title with an error and stays open. A title equal to the current one closes without writing. Titles are capped at 40 characters and duplicates are allowed, as they are when a group is created. The group keeps its id and its items, and no other group is touched. Renaming a group does not change the sections already created from it on any list.
 - A user can add items to a group.
+- A user can collapse or expand every group at once with a single button on the groups header, placed immediately before the `+` button. The button always shows the action it performs: `unfold_less` (collapse) while the groups are expanded, `unfold_more` (expand) while they are collapsed. Collapsed groups keep their title visible and hide their items and their "new item" field. The state is a view preference only — it is not stored, so reopening the groups view shows every group expanded.
 - A user can delete a group via drag-and-drop to the trash.
 - Groups are private to the user who created them.
 - When a group is added to a list, its items are copied into a new section on that list. Changes to the group after that do not affect the list section.
