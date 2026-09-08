@@ -1,0 +1,22 @@
+<h2 mat-dialog-title>{{ data.heading }}</h2>
+<mat-dialog-content>
+  <p class="confirm-message">{{ data.message }}</p>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <!--
+    Focus starts on Cancel, not on the button that acts: Enter fires a button on
+    keydown, so a held or repeated Enter from the control that opened this dialog
+    would otherwise carry straight through to an action with no undo.
+  -->
+  <button cdkFocusInitial mat-button class="cancel" (click)="onCancel()">
+    Cancel
+  </button>
+  <button
+    mat-raised-button
+    color="primary"
+    class="confirm"
+    (click)="onConfirm()"
+  >
+    {{ data.confirmLabel }}
+  </button>
+</mat-dialog-actions>
