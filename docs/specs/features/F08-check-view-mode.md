@@ -39,26 +39,42 @@ the same progress.
   the mode off (and the marks still visible).
 - The user can clear every mark on the list at once.
   - A `remove_done` button appears on the header only while checklist mode is on **and** at least
-    one item of the list is marked. There is nothing to reset otherwise, and the header stays at
-    four buttons the rest of the time.
-  - It asks for confirmation first ("Unmark all 12 items?"). This departs from the app's
-    drag-to-trash-without-confirmation habit on purpose: a drag is hard to perform by accident,
-    a single tap that wipes thirty marks with no undo is not.
+    one item of the list is marked. There is nothing to reset otherwise, and the header keeps to
+    four buttons at most the rest of the time (four for the owner of a list, three for a recipient
+    of a shared list, who gets no share button).
+  - It asks for confirmation first: the heading "Unmark all items?", the message
+    "12 items are marked as ready." naming the count, and "Unmark all" on the confirming button.
+    The count lives in the message rather than the heading so that only one of the two strings has
+    a plural form, and so the heading does not wrap in a 300&nbsp;px dialog. This departs from the
+    app's drag-to-trash-without-confirmation habit on purpose: a drag is hard to perform by
+    accident, a single tap that wipes thirty marks with no undo is not.
+  - Dismissing the dialog — backdrop or Escape — changes nothing, exactly as Cancel does.
 
 ## Acceptance criteria
 
-- [ ] User can enable checklist mode, and the button shows that it is on.
-- [ ] User can disable checklist mode.
-- [ ] User can mark an item.
-- [ ] User can unmark an item.
-- [ ] Marks survive a reload of the list.
-- [ ] With the mode off, marks are still visible and tapping an item changes nothing.
-- [ ] An item added after some marking starts unmarked.
-- [ ] A section added from a group starts unmarked.
-- [ ] An item keeps its mark when dragged to another section.
-- [ ] "Unmark all" clears every mark on the list after confirmation, and is absent while the
+- [x] User can enable checklist mode, and the button shows that it is on.
+- [x] User can disable checklist mode.
+- [x] User can mark an item.
+- [x] User can unmark an item.
+- [x] Marks survive a reload of the list.
+- [x] With the mode off, marks are still visible and tapping an item changes nothing.
+- [x] An item added after some marking starts unmarked.
+- [x] A section added from a group starts unmarked.
+- [x] An item keeps its mark when dragged to another section.
+- [x] "Unmark all" clears every mark on the list after confirmation, and is absent while the
       mode is off or while nothing is marked.
-- [ ] A recipient of a shared list sees the marks made by the owner.
+- [x] A recipient of a shared list sees the marks made by the owner.
+
+## Known gap
+
+A mark is conveyed visually only. An item row carries no `role`, no `tabindex` and no
+`aria-checked`, and cannot be marked without a pointer — so a screen-reader user hears the item's
+name with no indication of whether it is ready, and a keyboard-only user cannot mark anything at
+all. This is not a regression: item rows were never focusable, since the app's other item
+operations are all drag-and-drop. Fixing it properly means giving rows a checkbox role and a
+keyboard path, which is a change to how every item row works rather than to checklist mode, so it
+is deferred to its own feature. The mode toggle and the unmark-all button are themselves
+labelled and operable by keyboard.
 
 ## Technical notes
 
