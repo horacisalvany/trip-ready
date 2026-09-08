@@ -207,7 +207,7 @@ graph TD
     LID --> SECS["sections/"]
     SECS --> SEC["{sectionId}/"]
     SEC --> STITLE["title: string"]
-    SEC --> SITEMS["items: string[ ]"]
+    SEC --> SITEMS["items: Item[ ] of { name, checked }"]
     SEC --> SGID["sourceGroupId?: string"]
 
     GROUPS --> GID["{groupId}/"]

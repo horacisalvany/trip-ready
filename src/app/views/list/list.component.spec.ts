@@ -6,7 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule, MatTooltip } from '@angular/material/tooltip';
 import { CdkDrag, CdkDropList, DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { ActivatedRoute } from '@angular/router';
-import { of, Subject } from 'rxjs';
+import { Observable, of, Subject } from 'rxjs';
 import { ListComponent, formatSharedWith } from './list.component';
 import { TAP_MOVE_TOLERANCE_PX } from '../tap-guard';
 import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
@@ -45,6 +45,36 @@ const MOCK_SECTIONS: Section[] = [
  */
 function copySections(sections: Section[]): Section[] {
   return sections.map((s) => ({ ...s, items: s.items.map((i) => ({ ...i })) }));
+}
+
+/** One recorded call to a whole-section write: list id, section id, items. */
+type ItemsWrite = [string, string, Item[]];
+
+/*
+  Starts recording every whole-section write made through `spy`, snapshotting the
+  items as each call is made.
+
+  A plain toHaveBeenCalledWith cannot be trusted here: the spy records the live
+  array the handler passed it, and the handlers mutate that very array — and the
+  Item objects inside it — in place. By assert time every recorded call reads as
+  the final in-memory state, so "wrote the right array" is indistinguishable from
+  "wrote the wrong array and corrected it in memory afterwards". Both mistakes
+  are real: writing before clearing the marks in unmarkAll, or writing the target
+  section before transferArrayItem in dropItem, keep such an assertion green
+  while Firebase receives the wrong data. The copy is one level deep — a
+  `[...items]` would still share the Items, which are what gets mutated.
+ */
+function recordItemWrites(
+  spy: jasmine.Spy<
+    (listId: string, sectionId: string, items: Item[]) => Observable<void>
+  >
+): ItemsWrite[] {
+  const writes: ItemsWrite[] = [];
+  spy.and.callFake((listId, sectionId, items) => {
+    writes.push([listId, sectionId, items.map((item) => ({ ...item }))]);
+    return of(undefined);
+  });
+  return writes;
 }
 
 const MOCK_LIST: List = {
@@ -478,36 +508,6 @@ describe('ListComponent', () => {
       'list1',
       's2',
       unmarkedItems(['Phone', 'Passport', 'Charger'])
-    );
-  });
-
-  /*
-    Acceptance criterion: "An item keeps its mark when dragged to another
-    section." transferArrayItem moves the whole Item object rather than
-    rebuilding it, so the mark should ride along untouched.
-   */
-  it('should keep a mark when the item is dragged to another section', () => {
-    const sourceData = component.list!.sections[1].items; // s1: Packing
-    const targetData = component.list!.sections[2].items; // s2: Electronics
-    sourceData[0].checked = true; // Passport marked ready before the drag
-
-    const event = {
-      previousIndex: 0,
-      currentIndex: 1,
-      previousContainer: { id: 'cdk-drop-list-section-s1', data: sourceData },
-      container: { id: 'cdk-drop-list-section-s2', data: targetData },
-    } as unknown as CdkDragDrop<Item[]>;
-
-    component.dropItem(event);
-
-    expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
-      'list1',
-      's2',
-      [
-        { name: 'Phone', checked: false },
-        { name: 'Passport', checked: true },
-        { name: 'Charger', checked: false },
-      ]
     );
   });
 
@@ -1270,11 +1270,16 @@ describe('ListComponent', () => {
       ]);
     });
 
-    /* The mark lives inside the item, so transferArrayItem carries it along. */
+    /*
+      The mark lives inside the item, so transferArrayItem carries it along.
+      Snapshotted writes — see recordItemWrites: dropItem hands the spy the live
+      section arrays it has just rearranged, so asserting on them afterwards
+      cannot see whether the transfer happened before the write or after it.
+     */
     it('should keep a mark when the item is dragged to another section', () => {
       clickToggle();
       pressAndClick('Passport');
-      mockListService.updateSectionItems.calls.reset();
+      const writes = recordItemWrites(mockListService.updateSectionItems);
 
       const sourceData = component.list!.sections[1].items;
       const targetData = component.list!.sections[2].items;
@@ -1285,10 +1290,17 @@ describe('ListComponent', () => {
         container: { id: 'cdk-drop-list-section-s2', data: targetData },
       } as unknown as CdkDragDrop<any>);
 
-      expect(mockListService.updateSectionItems).toHaveBeenCalledWith('list1', 's2', [
-        { name: 'Passport', checked: true },
-        { name: 'Phone', checked: false },
-        { name: 'Charger', checked: false },
+      expect(writes).toEqual([
+        ['list1', 's1', [{ name: 'Tickets', checked: false }]],
+        [
+          'list1',
+          's2',
+          [
+            { name: 'Passport', checked: true },
+            { name: 'Phone', checked: false },
+            { name: 'Charger', checked: false },
+          ],
+        ],
       ]);
     });
   });
@@ -1391,22 +1403,37 @@ describe('ListComponent', () => {
       expect(unmarkButton()).toBeNull();
     });
 
-    /* One write per affected section, and nothing for the sections it did not touch. */
+    /*
+      One write per affected section, and nothing for the sections it did not
+      touch. Snapshotted writes — see recordItemWrites: unmarkAll clears the
+      flags on the same arrays it hands the spy, so asserting on them afterwards
+      would pass even if the writes had gone out with the marks still on.
+     */
     it('should save only the sections that had a mark', () => {
+      const writes = recordItemWrites(mockListService.updateSectionItems);
       markPassportAndCharger();
       enterChecklistMode();
       stubDialog(true);
 
       unmarkButton().nativeElement.click();
 
-      expect(mockListService.updateSectionItems).toHaveBeenCalledTimes(2);
-      expect(mockListService.updateSectionItems).toHaveBeenCalledWith('list1', 's1', [
-        { name: 'Passport', checked: false },
-        { name: 'Tickets', checked: false },
-      ]);
-      expect(mockListService.updateSectionItems).toHaveBeenCalledWith('list1', 's2', [
-        { name: 'Phone', checked: false },
-        { name: 'Charger', checked: false },
+      expect(writes).toEqual([
+        [
+          'list1',
+          's1',
+          [
+            { name: 'Passport', checked: false },
+            { name: 'Tickets', checked: false },
+          ],
+        ],
+        [
+          'list1',
+          's2',
+          [
+            { name: 'Phone', checked: false },
+            { name: 'Charger', checked: false },
+          ],
+        ],
       ]);
     });
 
@@ -1437,7 +1464,9 @@ describe('ListComponent', () => {
       expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
     });
 
+    /* Snapshotted writes for the same reason as the private-list spec above. */
     it('should write to the shared node for a shared list', () => {
+      const writes = recordItemWrites(mockListService.updateSharedSectionItems);
       component.isShared = true;
       markPassportAndCharger();
       enterChecklistMode();
@@ -1445,15 +1474,24 @@ describe('ListComponent', () => {
 
       unmarkButton().nativeElement.click();
 
-      expect(mockListService.updateSharedSectionItems).toHaveBeenCalledTimes(2);
-      expect(mockListService.updateSharedSectionItems).toHaveBeenCalledWith(
-        'list1',
-        's1',
+      expect(writes).toEqual([
         [
-          { name: 'Passport', checked: false },
-          { name: 'Tickets', checked: false },
-        ]
-      );
+          'list1',
+          's1',
+          [
+            { name: 'Passport', checked: false },
+            { name: 'Tickets', checked: false },
+          ],
+        ],
+        [
+          'list1',
+          's2',
+          [
+            { name: 'Phone', checked: false },
+            { name: 'Charger', checked: false },
+          ],
+        ],
+      ]);
       expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
     });
   });

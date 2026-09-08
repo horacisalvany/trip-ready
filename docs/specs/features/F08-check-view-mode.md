@@ -137,7 +137,7 @@ normalises any legacy strings in those sections.
 - `src/app/views/dialog-confirm/` (new) — small confirmation dialog, sibling of `dialog-rename`
 - `src/app/services/share.service.ts` — its `parseSections` calls the same normaliser as
   `ListService.parseSections`, so a bare legacy string reads as unmarked here too
-- `docs/specs/spec.md` — one bullet under **Lists**
+- `docs/specs/spec.md` — two bullets under **Lists**: checklist mode, and unmark-all
 
 ### Tests
 
