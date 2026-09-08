@@ -51,6 +51,11 @@ export class ListComponent implements OnInit {
     reopening the list shows every section expanded again.
    */
   sectionsCollapsed = false;
+  /*
+    Also a view preference — the marks are persisted, the mode is not, so a list
+    always opens ready to read rather than ready to be tapped.
+   */
+  checklistMode = false;
   readonly dragStartDelay = DRAG_START_DELAY;
   currentUserUid: string | null = null;
   /*
@@ -127,6 +132,18 @@ export class ListComponent implements OnInit {
 
   toggleSections(): void {
     this.sectionsCollapsed = !this.sectionsCollapsed;
+  }
+
+  /*
+    The icon never changes: this button reports the mode you are in, and the
+    label is the only place the next action can be spelled out.
+   */
+  get toggleChecklistLabel(): string {
+    return this.checklistMode ? 'Turn checklist mode off' : 'Turn checklist mode on';
+  }
+
+  toggleChecklistMode(): void {
+    this.checklistMode = !this.checklistMode;
   }
 
   openShareDialog(): void {

@@ -33,6 +33,17 @@
     >
       <mat-icon>{{ toggleSectionsIcon }}</mat-icon>
     </button>
+    <button
+      (click)="toggleChecklistMode()"
+      class="toggle-checklist"
+      [class.active]="checklistMode"
+      mat-icon-button
+      [title]="toggleChecklistLabel"
+      [attr.aria-label]="toggleChecklistLabel"
+      [attr.aria-pressed]="checklistMode"
+    >
+      <mat-icon>playlist_add_check</mat-icon>
+    </button>
     <button (click)="openDialogAddGroup()" mat-icon-button>
       <mat-icon>add</mat-icon>
     </button>

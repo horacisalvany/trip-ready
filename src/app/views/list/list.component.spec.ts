@@ -944,7 +944,7 @@ describe('ListComponent', () => {
         .queryAll(By.css('.button-row button'))
         .map((el) => el.query(By.css('mat-icon')).nativeElement.textContent.trim());
 
-      expect(buttons).toEqual(['share', 'unfold_less', 'add']);
+      expect(buttons).toEqual(['share', 'unfold_less', 'playlist_add_check', 'add']);
     });
 
     it('should collapse every section when clicked while expanded', () => {
@@ -981,6 +981,93 @@ describe('ListComponent', () => {
     });
 
     it('should not write the collapsed state to the backend', () => {
+      clickToggle();
+
+      expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
+      expect(mockListService.updateSharedSectionItems).not.toHaveBeenCalled();
+    });
+  });
+
+  // --- checklist mode (F08) ---
+
+  describe('checklist mode', () => {
+    function toggleButton() {
+      return fixture.debugElement.query(By.css('.toggle-checklist'));
+    }
+
+    function clickToggle(): void {
+      toggleButton().nativeElement.click();
+      fixture.detectChanges();
+    }
+
+    it('should start with checklist mode off', () => {
+      expect(component.checklistMode).toBeFalse();
+    });
+
+    function toggleIcon(): string {
+      return toggleButton().query(By.css('mat-icon')).nativeElement.textContent.trim();
+    }
+
+    /*
+      Unlike collapse-all, whose icon swaps to name the next action, this icon is
+      fixed in both states — turning it into a two-state icon would leave the mode
+      announcing itself twice and contradicting aria-pressed.
+     */
+    it('should always offer the checklist icon', () => {
+      expect(toggleIcon()).toBe('playlist_add_check');
+
+      clickToggle();
+
+      expect(toggleIcon()).toBe('playlist_add_check');
+    });
+
+    it('should sit between the collapse and add buttons', () => {
+      const buttons = fixture.debugElement
+        .queryAll(By.css('.button-row button'))
+        .map((el) => el.query(By.css('mat-icon')).nativeElement.textContent.trim());
+
+      expect(buttons).toEqual(['share', 'unfold_less', 'playlist_add_check', 'add']);
+    });
+
+    it('should turn checklist mode on when clicked', () => {
+      clickToggle();
+
+      expect(component.checklistMode).toBeTrue();
+    });
+
+    it('should turn checklist mode off when clicked again', () => {
+      clickToggle();
+      clickToggle();
+
+      expect(component.checklistMode).toBeFalse();
+    });
+
+    /*
+      The button reports a state, not an action: unlike collapse-all its icon
+      never changes, so pressed-ness is the only thing that says the mode is on.
+     */
+    it('should report whether it is pressed', () => {
+      const button = toggleButton().nativeElement as HTMLElement;
+      expect(button.getAttribute('aria-pressed')).toBe('false');
+      expect(button.classList).not.toContain('active');
+
+      clickToggle();
+
+      expect(button.getAttribute('aria-pressed')).toBe('true');
+      expect(button.classList).toContain('active');
+    });
+
+    it('should name the action it performs', () => {
+      const button = toggleButton().nativeElement as HTMLElement;
+      expect(button.getAttribute('aria-label')).toBe('Turn checklist mode on');
+
+      clickToggle();
+
+      expect(button.getAttribute('aria-label')).toBe('Turn checklist mode off');
+    });
+
+    /* A view preference, like collapse-all: reopening the list starts it off. */
+    it('should not write the mode to the backend', () => {
       clickToggle();
 
       expect(mockListService.updateSectionItems).not.toHaveBeenCalled();

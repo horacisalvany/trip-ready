@@ -92,3 +92,12 @@ mat-list-item[cdkDrag] {
     display: none;
   }
 }
+
+/*
+  A mode you are in, not an action you can take, so the button carries the state
+  on its face. Same indigo the section titles use.
+ */
+.toggle-checklist.active {
+  background: #3f51b5;
+  color: #fff;
+}
