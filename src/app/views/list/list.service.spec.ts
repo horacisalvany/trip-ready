@@ -142,6 +142,36 @@ describe('ListService', () => {
         done();
       });
     });
+
+    /*
+      A recipient reads the owner's marks through this method, so it has to run
+      items through parseItems the same way getList does. Asserted here rather
+      than inferred from both sharing parseSections: ShareService kept its own
+      copy of parseSections once already, so an inlined mapping here would drop
+      every recipient's marks with nothing else to catch it. The legacy string
+      alongside the marked item covers the shared path's normalisation too.
+     */
+    it('should keep the marks stored on a shared list', (done) => {
+      mockDbObject.valueChanges.and.returnValue(
+        of({
+          title: 'Shared Trip',
+          sections: {
+            s1: {
+              title: 'Packing',
+              items: [{ name: 'Passport', checked: true }, 'Tickets'],
+            },
+          },
+        })
+      );
+
+      service.getSharedList('sharedId1').subscribe((list) => {
+        expect(list!.sections[0].items).toEqual([
+          { name: 'Passport', checked: true },
+          { name: 'Tickets', checked: false },
+        ]);
+        done();
+      });
+    });
   });
 
   describe('updateSharedSectionItems', () => {

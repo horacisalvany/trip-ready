@@ -467,25 +467,39 @@ describe('ListComponent', () => {
 
   // --- dropItem (reorder / transfer between sections) ---
 
+  /*
+    Snapshotted writes — see recordItemWrites. dropItem hands the spy the section's
+    live array, so asserting the recorded reference would only re-read the final
+    in-memory order and would stay green if the write went out before the move.
+
+    One container object for both ends, not two alike ones: dropItem tells a
+    reorder from a transfer by reference, exactly as the CDK hands it over, so two
+    equal-looking literals would take the transfer branch and write s1 twice.
+   */
   it('should reorder items within the same section', () => {
-    const containerData = component.list!.sections[1].items;
+    const writes = recordItemWrites(mockListService.updateSectionItems);
+    const container = {
+      id: 'cdk-drop-list-section-s1',
+      data: component.list!.sections[1].items,
+    };
     const event = {
       previousIndex: 0,
       currentIndex: 1,
-      previousContainer: { id: 'cdk-drop-list-section-s1', data: containerData },
-      container: { id: 'cdk-drop-list-section-s1', data: containerData },
+      previousContainer: container,
+      container,
     } as unknown as CdkDragDrop<Item[]>;
 
     component.dropItem(event);
 
-    expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
-      'list1',
-      's1',
-      unmarkedItems(['Tickets', 'Passport'])
-    );
+    expect(writes).toEqual([['list1', 's1', unmarkedItems(['Tickets', 'Passport'])]]);
   });
 
+  /*
+    Both sections are asserted in the order dropItem writes them — source first,
+    then target — so a write emitted before transferArrayItem cannot pass.
+   */
   it('should transfer an item between sections', () => {
+    const writes = recordItemWrites(mockListService.updateSectionItems);
     const sourceData = component.list!.sections[1].items; // s1: Packing
     const targetData = component.list!.sections[2].items; // s2: Electronics
     const event = {
@@ -497,18 +511,10 @@ describe('ListComponent', () => {
 
     component.dropItem(event);
 
-    // Source section updated (item removed)
-    expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
-      'list1',
-      's1',
-      unmarkedItems(['Tickets'])
-    );
-    // Target section updated (item added)
-    expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
-      'list1',
-      's2',
-      unmarkedItems(['Phone', 'Passport', 'Charger'])
-    );
+    expect(writes).toEqual([
+      ['list1', 's1', unmarkedItems(['Tickets'])],
+      ['list1', 's2', unmarkedItems(['Phone', 'Passport', 'Charger'])],
+    ]);
   });
 
   // --- recentlyDropped guard ---
