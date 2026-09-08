@@ -28,11 +28,18 @@ export function unmarkedItems(names: string[]): Item[] {
   A stored item is either a bare string (written before F08) or an
   { name, checked } object. Firebase's SDK renders a list as a JSON array only
   while its integer keys are dense enough, and falls back to a keyed object
-  below that threshold; a scalar means the node holds neither. Every write in
-  this app replaces the whole items array in one shot, so this app itself
-  never produces a sparse array or a keyed-object node — the fallback below is
-  cheap defence against data that arrived some other way. Both ListService
-  and ShareService read the same `sharedLists/{id}` shape, so both call this
+  below that threshold; a scalar means the node holds neither. Almost every
+  write in this app replaces the whole items array in one shot, so it never
+  produces a sparse array or a keyed-object node — except updateItemAt and
+  updateSharedItemAt, which set one item at its index and can leave a hole or
+  a sparse tail if that index is past the end of a shorter, concurrently
+  edited array. The fallback below is what makes such a node readable at all:
+  without it a hole surfaces as an undefined row and reading its name throws.
+  It is not a repair, though — compacting the holes away is exactly what
+  decouples a position in this array from the Firebase key it came from, so an
+  index-based write afterwards can land on the wrong item. See updateItemAt
+  for that race and why it is still the better trade. Both ListService and
+  ShareService read the same `sharedLists/{id}` shape, so both call this
   rather than keeping their own copy.
  */
 export function parseItems(itemsObj: any): Item[] {

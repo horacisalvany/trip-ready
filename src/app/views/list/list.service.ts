@@ -188,6 +188,48 @@ export class ListService {
   }
 
   /*
+    Two people ticking off different items in the same section is the common
+    case in checklist mode, and a whole-array write — what every other edit
+    does — carries whatever `checked` values were already in memory before
+    someone else's latest write landed. Doing that on every tap would let each
+    participant's read-modify-write clobber the other's mark on essentially
+    every tap. Writing one item at its own index touches only that path:
+    marking different items touches disjoint paths and can't conflict, and
+    two people marking the same item write the same value.
+
+    This does not make marking safe outright, only safe against mark-vs-mark.
+    `index` is a position into parseItems' output, not a stable identity, and
+    it addresses the stored node directly — valid only while item nodes stay
+    dense. If a co-editor deletes or reorders items between this client's read
+    and this write, the index is now a stale bet: it can land on the wrong
+    item, or past the end of a shorter array and leave a sparse node (see
+    parseItems). That residual race self-heals on the next add, delete or
+    reorder, since those rewrite the whole array.
+
+    `set` rather than `update` because a section written before F08 still holds a
+    bare string at this path, and `update` on a string node would replace it with
+    `{ checked }` and lose the name.
+   */
+  updateItemAt(
+    listId: string,
+    sectionId: string,
+    index: number,
+    item: Item
+  ): Observable<void> {
+    return this.userPath().pipe(
+      take(1),
+      switchMap((path) => {
+        if (!path) return of(undefined as void);
+        return from(
+          this.db
+            .object(`${path}/lists/${listId}/sections/${sectionId}/items/${index}`)
+            .set(item)
+        );
+      })
+    );
+  }
+
+  /*
     `update` rather than `set`, so the section keeps its items and its
     sourceGroupId. The id is the Firebase key and is untouched by a rename.
    */
@@ -238,6 +280,24 @@ export class ListService {
       this.db
         .object(`sharedLists/${listId}/sections/${sectionId}`)
         .update({ items })
+    );
+  }
+
+  /*
+    No take(1): the shared node is addressed by list id alone, so this never
+    reads the long-lived user$ stream. See updateItemAt for why it sets the whole
+    item.
+   */
+  updateSharedItemAt(
+    listId: string,
+    sectionId: string,
+    index: number,
+    item: Item
+  ): Observable<void> {
+    return from(
+      this.db
+        .object(`sharedLists/${listId}/sections/${sectionId}/items/${index}`)
+        .set(item)
     );
   }
 

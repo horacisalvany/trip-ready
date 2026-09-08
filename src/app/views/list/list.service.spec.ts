@@ -3,6 +3,7 @@ import { AngularFireDatabase } from '@angular/fire/compat/database';
 import { BehaviorSubject, of } from 'rxjs';
 import { ListService } from './list.service';
 import { AuthService } from '../../services/auth.service';
+import { parseItems } from './item';
 
 describe('ListService', () => {
   let service: ListService;
@@ -13,6 +14,7 @@ describe('ListService', () => {
     mockDbObject = jasmine.createSpyObj('AngularFireObject', [
       'valueChanges',
       'update',
+      'set',
     ]);
 
     mockDb = jasmine.createSpyObj('AngularFireDatabase', ['object', 'list']);
@@ -257,9 +259,7 @@ describe('ListService', () => {
 
     /*
       Firebase's SDK falls back to a keyed object once a list's integer keys
-      are sparse enough. Every write in this app replaces the whole items
-      array in one shot, so this app itself never produces that shape — this
-      guards against data that arrived some other way.
+      are sparse enough. See parseItems for how this shape can arise.
      */
     it('should read items returned as a keyed object', (done) => {
       emitStoredList({ s1: { title: 'Packing', items: { 0: 'Passport', 2: 'Hat' } } });
@@ -284,10 +284,8 @@ describe('ListService', () => {
 
     /*
       Firebase's SDK renders a sparse array with null gaps while the integer
-      keys are still dense enough, and only falls back to a keyed object
-      below that threshold — a gap this app itself never leaves, since every
-      write replaces the whole items array in one shot, but that data can
-      arrive as either shape.
+      keys are still dense enough, and only falls back to a keyed object below
+      that threshold, so the same gap reaches us as either shape.
      */
     it('should drop null holes in a sparse array', (done) => {
       emitStoredList({ s1: { title: 'Packing', items: ['Passport', null, 'Hat'] } });
@@ -390,6 +388,100 @@ describe('ListService', () => {
           expect(mockDbObject.update).toHaveBeenCalledWith({
             title: 'Beach gear',
           });
+          done();
+        });
+    });
+  });
+
+  describe('updateItemAt', () => {
+    /* See updateItemAt: set heals the legacy string shape without losing the name. */
+    it('should set the whole item at its index under the user lists path', (done) => {
+      mockDbObject.set.and.returnValue(Promise.resolve());
+
+      service
+        .updateItemAt('l1', 'sec1', 2, { name: 'Passport', checked: true })
+        .subscribe(() => {
+          expect(mockDb.object).toHaveBeenCalledWith(
+            'users/testUid/lists/l1/sections/sec1/items/2'
+          );
+          expect(mockDbObject.set).toHaveBeenCalledWith({
+            name: 'Passport',
+            checked: true,
+          });
+          done();
+        });
+    });
+
+    /* The write rule in CLAUDE.md. */
+    it('should write once even when the auth user changes afterwards', () => {
+      const user$ = new BehaviorSubject<{ uid: string } | null>({ uid: 'testUid' });
+      const isolatedService = new ListService(mockDb, { user$ } as any);
+      mockDbObject.set.and.returnValue(Promise.resolve());
+
+      isolatedService
+        .updateItemAt('l1', 'sec1', 0, { name: 'Passport', checked: true })
+        .subscribe();
+      user$.next({ uid: 'otherUid' });
+
+      expect(mockDbObject.set).toHaveBeenCalledTimes(1);
+      expect(mockDb.object).not.toHaveBeenCalledWith(
+        'users/otherUid/lists/l1/sections/sec1/items/0'
+      );
+    });
+
+    /*
+      A tap can race a logout: user$ emits null and userPath() yields no path.
+      Matches every sibling method — complete silently, write nothing — since
+      no caller inspects the result and a live stream would revert the row on
+      the next emission anyway.
+     */
+    it('should complete without writing when the user is signed out', () => {
+      const user$ = new BehaviorSubject<{ uid: string } | null>(null);
+      const isolatedService = new ListService(mockDb, { user$ } as any);
+      let completed = false;
+
+      isolatedService
+        .updateItemAt('l1', 'sec1', 0, { name: 'Passport', checked: true })
+        .subscribe({ complete: () => (completed = true) });
+
+      expect(mockDbObject.set).not.toHaveBeenCalled();
+      expect(completed).toBeTrue();
+    });
+
+    /*
+      Pins the hazard documented on parseItems and updateItemAt: a sparse
+      stored node collapses position and key, so the index parseItems assigns
+      is not the stored key. If this stops matching, parseItems changed to
+      preserve keys and updateItemAt's index contract needs to change with it.
+     */
+    it('should write to the position parseItems assigned, not the original stored key, for a sparse node', (done) => {
+      const items = parseItems({ 0: 'Passport', 2: 'Hat' });
+      const hatIndex = items.findIndex((item) => item.name === 'Hat');
+      expect(hatIndex).toBe(1); // stored under key 2, but parseItems compacts it to position 1
+      mockDbObject.set.and.returnValue(Promise.resolve());
+
+      service
+        .updateItemAt('l1', 'sec1', hatIndex, { name: 'Hat', checked: true })
+        .subscribe(() => {
+          expect(mockDb.object).toHaveBeenCalledWith(
+            'users/testUid/lists/l1/sections/sec1/items/1'
+          );
+          done();
+        });
+    });
+  });
+
+  describe('updateSharedItemAt', () => {
+    it('should set the whole item at its index under the sharedLists path', (done) => {
+      mockDbObject.set.and.returnValue(Promise.resolve());
+
+      service
+        .updateSharedItemAt('sharedId1', 'sec1', 0, { name: 'Milk', checked: true })
+        .subscribe(() => {
+          expect(mockDb.object).toHaveBeenCalledWith(
+            'sharedLists/sharedId1/sections/sec1/items/0'
+          );
+          expect(mockDbObject.set).toHaveBeenCalledWith({ name: 'Milk', checked: true });
           done();
         });
     });
