@@ -203,8 +203,8 @@ export class ListService {
     dense. If a co-editor deletes or reorders items between this client's read
     and this write, the index is now a stale bet: it can land on the wrong
     item, or past the end of a shorter array and leave a sparse node (see
-    parseItems). That residual race self-heals on the next add, delete or
-    reorder, since those rewrite the whole array.
+    parseItems). That residual race self-heals on the next add, delete, reorder
+    or unmark-all, since those rewrite the whole array.
 
     `set` rather than `update` because a section written before F08 still holds a
     bare string at this path, and `update` on a string node would replace it with

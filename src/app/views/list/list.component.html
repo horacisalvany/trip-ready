@@ -44,6 +44,16 @@
     >
       <mat-icon>playlist_add_check</mat-icon>
     </button>
+    <button
+      *ngIf="canUnmarkAll"
+      (click)="unmarkAll()"
+      class="unmark-all"
+      mat-icon-button
+      title="Unmark all items"
+      aria-label="Unmark all items"
+    >
+      <mat-icon>remove_done</mat-icon>
+    </button>
     <button (click)="openDialogAddGroup()" mat-icon-button>
       <mat-icon>add</mat-icon>
     </button>

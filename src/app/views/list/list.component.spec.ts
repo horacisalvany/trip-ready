@@ -12,6 +12,7 @@ import { TAP_MOVE_TOLERANCE_PX } from '../tap-guard';
 import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
 import { DialogRenameComponent } from '../dialog-rename/dialog-rename.component';
+import { DialogConfirmComponent } from '../dialog-confirm/dialog-confirm.component';
 import { AddSectionsResult } from './dialog-add-group/dialog-add-group.component';
 import { GroupService } from '../group/group.service';
 import { AuthService } from '../../services/auth.service';
@@ -1289,6 +1290,171 @@ describe('ListComponent', () => {
         { name: 'Phone', checked: false },
         { name: 'Charger', checked: false },
       ]);
+    });
+  });
+
+  // --- unmark all (F08) ---
+
+  describe('unmark all', () => {
+    function unmarkButton() {
+      return fixture.debugElement.query(By.css('.unmark-all'));
+    }
+
+    function enterChecklistMode(): void {
+      fixture.debugElement.query(By.css('.toggle-checklist')).nativeElement.click();
+      fixture.detectChanges();
+    }
+
+    /* Marks two items directly: this block is about clearing them, not making them. */
+    function markPassportAndCharger(): void {
+      component.list!.sections[1].items[0].checked = true;
+      component.list!.sections[2].items[1].checked = true;
+      fixture.detectChanges();
+    }
+
+    function stubDialog(closesWith: boolean | undefined) {
+      const dialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
+      dialogRef.afterClosed.and.returnValue(of(closesWith));
+      return spyOn(component.dialog, 'open').and.returnValue(dialogRef);
+    }
+
+    it('should be absent while the mode is off, even with items marked', () => {
+      markPassportAndCharger();
+
+      expect(unmarkButton()).toBeNull();
+    });
+
+    /* Nothing to reset, so the header stays at four buttons. */
+    it('should be absent while nothing is marked', () => {
+      enterChecklistMode();
+
+      expect(unmarkButton()).toBeNull();
+    });
+
+    it('should appear once the mode is on and something is marked', () => {
+      markPassportAndCharger();
+      enterChecklistMode();
+
+      expect(unmarkButton()).not.toBeNull();
+      expect(
+        unmarkButton().query(By.css('mat-icon')).nativeElement.textContent.trim()
+      ).toBe('remove_done');
+    });
+
+    it('should ask before clearing, counting what is marked', () => {
+      markPassportAndCharger();
+      enterChecklistMode();
+      const open = stubDialog(false);
+
+      unmarkButton().nativeElement.click();
+
+      expect(open).toHaveBeenCalledWith(
+        DialogConfirmComponent,
+        jasmine.objectContaining({
+          data: {
+            heading: 'Unmark all items?',
+            message: '2 items are marked as ready.',
+            confirmLabel: 'Unmark all',
+          },
+        })
+      );
+    });
+
+    it('should count a single mark in the singular', () => {
+      component.list!.sections[1].items[0].checked = true;
+      fixture.detectChanges();
+      enterChecklistMode();
+      const open = stubDialog(false);
+
+      unmarkButton().nativeElement.click();
+
+      expect(open).toHaveBeenCalledWith(
+        DialogConfirmComponent,
+        jasmine.objectContaining({
+          data: jasmine.objectContaining({ message: '1 item is marked as ready.' }),
+        })
+      );
+    });
+
+    it('should clear every mark when confirmed', () => {
+      markPassportAndCharger();
+      enterChecklistMode();
+      stubDialog(true);
+
+      unmarkButton().nativeElement.click();
+      fixture.detectChanges();
+
+      const marks = component
+        .list!.sections.flatMap((s) => s.items)
+        .map((i) => i.checked);
+      expect(marks).toEqual([false, false, false, false]);
+      expect(unmarkButton()).toBeNull();
+    });
+
+    /* One write per affected section, and nothing for the sections it did not touch. */
+    it('should save only the sections that had a mark', () => {
+      markPassportAndCharger();
+      enterChecklistMode();
+      stubDialog(true);
+
+      unmarkButton().nativeElement.click();
+
+      expect(mockListService.updateSectionItems).toHaveBeenCalledTimes(2);
+      expect(mockListService.updateSectionItems).toHaveBeenCalledWith('list1', 's1', [
+        { name: 'Passport', checked: false },
+        { name: 'Tickets', checked: false },
+      ]);
+      expect(mockListService.updateSectionItems).toHaveBeenCalledWith('list1', 's2', [
+        { name: 'Phone', checked: false },
+        { name: 'Charger', checked: false },
+      ]);
+    });
+
+    it('should change nothing when Cancel is pressed', () => {
+      markPassportAndCharger();
+      enterChecklistMode();
+      stubDialog(false);
+
+      unmarkButton().nativeElement.click();
+
+      expect(component.list!.sections[1].items[0].checked).toBeTrue();
+      expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
+    });
+
+    /*
+      A backdrop click or Escape closes with undefined rather than the false Cancel
+      sends, so "no" arrives here by two different routes — see
+      DialogConfirmComponent.onCancel for why the dismissal is left as undefined.
+     */
+    it('should change nothing when the dialog is dismissed', () => {
+      markPassportAndCharger();
+      enterChecklistMode();
+      stubDialog(undefined);
+
+      unmarkButton().nativeElement.click();
+
+      expect(component.list!.sections[1].items[0].checked).toBeTrue();
+      expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
+    });
+
+    it('should write to the shared node for a shared list', () => {
+      component.isShared = true;
+      markPassportAndCharger();
+      enterChecklistMode();
+      stubDialog(true);
+
+      unmarkButton().nativeElement.click();
+
+      expect(mockListService.updateSharedSectionItems).toHaveBeenCalledTimes(2);
+      expect(mockListService.updateSharedSectionItems).toHaveBeenCalledWith(
+        'list1',
+        's1',
+        [
+          { name: 'Passport', checked: false },
+          { name: 'Tickets', checked: false },
+        ]
+      );
+      expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
     });
   });
 
