@@ -145,7 +145,12 @@ erDiagram
         string sourceGroupId FK
     }
 
-    ITEM {
+    SECTION_ITEM {
+        string name
+        boolean checked
+    }
+
+    GROUP_ITEM {
         string value
     }
 
@@ -177,8 +182,8 @@ erDiagram
     USER ||--o{ SHARED_LIST_IDS : "references"
 
     LIST ||--o{ SECTION : "contains"
-    SECTION ||--o{ ITEM : "has"
-    GROUP ||--o{ ITEM : "has"
+    SECTION ||--o{ SECTION_ITEM : "has"
+    GROUP ||--o{ GROUP_ITEM : "has"
     SECTION }o--o| GROUP : "sourced from"
 
     SHARED_LIST ||--o{ SECTION : "contains"
@@ -207,7 +212,7 @@ graph TD
     LID --> SECS["sections/"]
     SECS --> SEC["{sectionId}/"]
     SEC --> STITLE["title: string"]
-    SEC --> SITEMS["items: string[ ]"]
+    SEC --> SITEMS["items: Item[ ] of { name, checked }"]
     SEC --> SGID["sourceGroupId?: string"]
 
     GROUPS --> GID["{groupId}/"]

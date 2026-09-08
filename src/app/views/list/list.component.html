@@ -33,6 +33,27 @@
     >
       <mat-icon>{{ toggleSectionsIcon }}</mat-icon>
     </button>
+    <button
+      (click)="toggleChecklistMode()"
+      class="toggle-checklist"
+      [class.active]="checklistMode"
+      mat-icon-button
+      [title]="toggleChecklistLabel"
+      [attr.aria-label]="toggleChecklistLabel"
+      [attr.aria-pressed]="checklistMode"
+    >
+      <mat-icon>playlist_add_check</mat-icon>
+    </button>
+    <button
+      *ngIf="canUnmarkAll"
+      (click)="unmarkAll()"
+      class="unmark-all"
+      mat-icon-button
+      title="Unmark all items"
+      aria-label="Unmark all items"
+    >
+      <mat-icon>remove_done</mat-icon>
+    </button>
     <button (click)="openDialogAddGroup()" mat-icon-button>
       <mat-icon>add</mat-icon>
     </button>
@@ -91,8 +112,11 @@
             cdkDrag
             [cdkDragData]="{ type: 'item', sectionId: section.id }"
             [cdkDragStartDelay]="dragStartDelay"
-            *ngFor="let item of section.items"
-          >{{ item }}</mat-list-item>
+            *ngFor="let item of section.items; let itemIndex = index"
+            [class.ready]="item.checked"
+            (mousedown)="onItemPressStart($event)"
+            (click)="toggleItemMark(section, itemIndex, $event)"
+          >{{ item.name }}</mat-list-item>
         </mat-list>
         <div class="add-item-row">
           <input

@@ -6,30 +6,81 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule, MatTooltip } from '@angular/material/tooltip';
 import { CdkDrag, CdkDropList, DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { ActivatedRoute } from '@angular/router';
-import { of, Subject } from 'rxjs';
+import { Observable, of, Subject } from 'rxjs';
 import { ListComponent, formatSharedWith } from './list.component';
 import { TAP_MOVE_TOLERANCE_PX } from '../tap-guard';
 import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
 import { DialogRenameComponent } from '../dialog-rename/dialog-rename.component';
+import { DialogConfirmComponent } from '../dialog-confirm/dialog-confirm.component';
 import { AddSectionsResult } from './dialog-add-group/dialog-add-group.component';
 import { GroupService } from '../group/group.service';
 import { AuthService } from '../../services/auth.service';
 import { Group } from '../group/group';
 import { List } from '../lists/list';
 import { Section } from './section';
+import { Item, unmarkedItems } from './item';
 import { expectAllDragsHaveStartDelay } from '../drag-config.spec-helper';
 
 const MOCK_SECTIONS: Section[] = [
   { id: 'ungrouped', title: UNGROUPED_SECTION_TITLE, items: [] },
-  { id: 's1', title: 'Packing', items: ['Passport', 'Tickets'], sourceGroupId: 'g1' },
-  { id: 's2', title: 'Electronics', items: ['Phone', 'Charger'], sourceGroupId: 'g3' },
+  {
+    id: 's1',
+    title: 'Packing',
+    items: unmarkedItems(['Passport', 'Tickets']),
+    sourceGroupId: 'g1',
+  },
+  {
+    id: 's2',
+    title: 'Electronics',
+    items: unmarkedItems(['Phone', 'Charger']),
+    sourceGroupId: 'g3',
+  },
 ];
+
+/*
+  A fresh copy for every consumer. Items are objects now, so spreading the array
+  alone would share the item references: one test marking an item would mutate
+  MOCK_SECTIONS and leak into the next.
+ */
+function copySections(sections: Section[]): Section[] {
+  return sections.map((s) => ({ ...s, items: s.items.map((i) => ({ ...i })) }));
+}
+
+/** One recorded call to a whole-section write: list id, section id, items. */
+type ItemsWrite = [string, string, Item[]];
+
+/*
+  Starts recording every whole-section write made through `spy`, snapshotting the
+  items as each call is made.
+
+  A plain toHaveBeenCalledWith cannot be trusted here: the spy records the live
+  array the handler passed it, and the handlers mutate that very array — and the
+  Item objects inside it — in place. By assert time every recorded call reads as
+  the final in-memory state, so "wrote the right array" is indistinguishable from
+  "wrote the wrong array and corrected it in memory afterwards". Both mistakes
+  are real: writing before clearing the marks in unmarkAll, or writing the target
+  section before transferArrayItem in dropItem, keep such an assertion green
+  while Firebase receives the wrong data. The copy is one level deep — a
+  `[...items]` would still share the Items, which are what gets mutated.
+ */
+function recordItemWrites(
+  spy: jasmine.Spy<
+    (listId: string, sectionId: string, items: Item[]) => Observable<void>
+  >
+): ItemsWrite[] {
+  const writes: ItemsWrite[] = [];
+  spy.and.callFake((listId, sectionId, items) => {
+    writes.push([listId, sectionId, items.map((item) => ({ ...item }))]);
+    return of(undefined);
+  });
+  return writes;
+}
 
 const MOCK_LIST: List = {
   id: 'list1',
   title: 'Paris Trip',
-  sections: MOCK_SECTIONS.map((s) => ({ ...s, items: [...s.items] })),
+  sections: copySections(MOCK_SECTIONS),
 };
 
 const MOCK_GROUPS: Group[] = [
@@ -61,28 +112,31 @@ describe('ListComponent', () => {
       'addEmptySectionToList',
       'removeSectionFromList',
       'updateSectionItems',
+      'updateItemAt',
       'renameSection',
       'addSharedSectionToList',
       'addEmptySharedSectionToList',
       'updateSharedSectionItems',
+      'updateSharedItemAt',
       'renameSharedSection',
     ]);
     mockListService.getList.and.returnValue(
-      of({
-        ...MOCK_LIST,
-        sections: MOCK_LIST.sections.map((s) => ({ ...s, items: [...s.items] })),
-      })
+      of({ ...MOCK_LIST, sections: copySections(MOCK_LIST.sections) })
     );
     mockListService.addSectionToList.and.returnValue(of('newSectionId'));
     mockListService.addEmptySectionToList.and.returnValue(of('newSectionId'));
     mockListService.removeSectionFromList.and.returnValue(of(undefined));
     mockListService.updateSectionItems.and.returnValue(of(undefined));
     mockListService.renameSection.and.returnValue(of(undefined));
-    mockListService.getSharedList.and.returnValue(of({...MOCK_LIST, isShared: true, sections: MOCK_LIST.sections.map(s => ({...s, items: [...s.items]}))}));
+    mockListService.getSharedList.and.returnValue(
+      of({ ...MOCK_LIST, isShared: true, sections: copySections(MOCK_LIST.sections) })
+    );
     mockListService.addSharedSectionToList.and.returnValue(of('newSectionId'));
     mockListService.addEmptySharedSectionToList.and.returnValue(of('newSectionId'));
     mockListService.updateSharedSectionItems.and.returnValue(of(undefined));
     mockListService.renameSharedSection.and.returnValue(of(undefined));
+    mockListService.updateItemAt.and.returnValue(of(undefined));
+    mockListService.updateSharedItemAt.and.returnValue(of(undefined));
 
     mockGroupService = jasmine.createSpyObj('GroupService', ['getGroups']);
     mockGroupService.getGroups.and.returnValue(
@@ -114,6 +168,11 @@ describe('ListComponent', () => {
     fixture.detectChanges();
   });
 
+  /* Every item row currently rendered, across every section. */
+  function itemRows() {
+    return fixture.debugElement.queryAll(By.css('mat-list-item'));
+  }
+
   it('should create', () => {
     expect(component).toBeTruthy();
   });
@@ -141,7 +200,7 @@ describe('ListComponent', () => {
     expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
       'list1',
       's1',
-      ['Passport', 'Tickets', 'Sunglasses']
+      unmarkedItems(['Passport', 'Tickets', 'Sunglasses'])
     );
   });
 
@@ -151,7 +210,7 @@ describe('ListComponent', () => {
     expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
       'list1',
       's1',
-      ['Passport', 'Tickets', 'Hat']
+      unmarkedItems(['Passport', 'Tickets', 'Hat'])
     );
   });
 
@@ -371,7 +430,7 @@ describe('ListComponent', () => {
     expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
       'list1',
       's1',
-      ['Tickets']
+      unmarkedItems(['Tickets'])
     );
   });
 
@@ -388,7 +447,7 @@ describe('ListComponent', () => {
     expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
       'list1',
       's2',
-      ['Phone']
+      unmarkedItems(['Phone'])
     );
   });
 
@@ -408,25 +467,39 @@ describe('ListComponent', () => {
 
   // --- dropItem (reorder / transfer between sections) ---
 
+  /*
+    Snapshotted writes — see recordItemWrites. dropItem hands the spy the section's
+    live array, so asserting the recorded reference would only re-read the final
+    in-memory order and would stay green if the write went out before the move.
+
+    One container object for both ends, not two alike ones: dropItem tells a
+    reorder from a transfer by reference, exactly as the CDK hands it over, so two
+    equal-looking literals would take the transfer branch and write s1 twice.
+   */
   it('should reorder items within the same section', () => {
-    const containerData = component.list!.sections[1].items;
+    const writes = recordItemWrites(mockListService.updateSectionItems);
+    const container = {
+      id: 'cdk-drop-list-section-s1',
+      data: component.list!.sections[1].items,
+    };
     const event = {
       previousIndex: 0,
       currentIndex: 1,
-      previousContainer: { id: 'cdk-drop-list-section-s1', data: containerData },
-      container: { id: 'cdk-drop-list-section-s1', data: containerData },
-    } as unknown as CdkDragDrop<string[]>;
+      previousContainer: container,
+      container,
+    } as unknown as CdkDragDrop<Item[]>;
 
     component.dropItem(event);
 
-    expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
-      'list1',
-      's1',
-      ['Tickets', 'Passport']
-    );
+    expect(writes).toEqual([['list1', 's1', unmarkedItems(['Tickets', 'Passport'])]]);
   });
 
+  /*
+    Both sections are asserted in the order dropItem writes them — source first,
+    then target — so a write emitted before transferArrayItem cannot pass.
+   */
   it('should transfer an item between sections', () => {
+    const writes = recordItemWrites(mockListService.updateSectionItems);
     const sourceData = component.list!.sections[1].items; // s1: Packing
     const targetData = component.list!.sections[2].items; // s2: Electronics
     const event = {
@@ -434,22 +507,14 @@ describe('ListComponent', () => {
       currentIndex: 1,
       previousContainer: { id: 'cdk-drop-list-section-s1', data: sourceData },
       container: { id: 'cdk-drop-list-section-s2', data: targetData },
-    } as unknown as CdkDragDrop<string[]>;
+    } as unknown as CdkDragDrop<Item[]>;
 
     component.dropItem(event);
 
-    // Source section updated (item removed)
-    expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
-      'list1',
-      's1',
-      ['Tickets']
-    );
-    // Target section updated (item added)
-    expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
-      'list1',
-      's2',
-      ['Phone', 'Passport', 'Charger']
-    );
+    expect(writes).toEqual([
+      ['list1', 's1', unmarkedItems(['Tickets'])],
+      ['list1', 's2', unmarkedItems(['Phone', 'Passport', 'Charger'])],
+    ]);
   });
 
   // --- recentlyDropped guard ---
@@ -601,10 +666,7 @@ describe('ListComponent', () => {
       produce both, and must not disturb the sections already on the list.
      */
     it('should create the typed section alongside the selected group sections', () => {
-      const sectionsBefore = component.list!.sections.map((s) => ({
-        ...s,
-        items: [...s.items],
-      }));
+      const sectionsBefore = copySections(component.list!.sections);
 
       closeDialogWith(dialogResult([MOCK_GROUPS[1]], 'Beach gear'));
 
@@ -748,8 +810,14 @@ describe('ListComponent', () => {
   // --- shared-with info tooltip ---
 
   describe('shared-with info icon', () => {
+    /*
+      Clones sections before assigning, not just the list wrapper: every
+      caller spreads MOCK_LIST, and a shallow spread still shares its sections
+      array and every Item object. Without this a test that marks an item
+      would mutate MOCK_LIST for every test that runs after it.
+     */
     function setList(list: List): void {
-      component.list = list;
+      component.list = { ...list, sections: copySections(list.sections) };
       fixture.detectChanges();
     }
 
@@ -802,8 +870,14 @@ describe('ListComponent', () => {
   // --- share button visibility (owner-only sharing) ---
 
   describe('share button', () => {
+    /*
+      Clones sections before assigning, not just the list wrapper: every
+      caller spreads MOCK_LIST, and a shallow spread still shares its sections
+      array and every Item object. Without this a test that marks an item
+      would mutate MOCK_LIST for every test that runs after it.
+     */
     function setList(list: List): void {
-      component.list = list;
+      component.list = { ...list, sections: copySections(list.sections) };
       fixture.detectChanges();
     }
 
@@ -854,10 +928,6 @@ describe('ListComponent', () => {
       return toggleButton().query(By.css('mat-icon')).nativeElement.textContent.trim();
     }
 
-    function sectionItems() {
-      return fixture.debugElement.queryAll(By.css('mat-list-item'));
-    }
-
     function addItemRows() {
       return fixture.debugElement.queryAll(By.css('.add-item-row'));
     }
@@ -873,7 +943,7 @@ describe('ListComponent', () => {
 
     it('should start with the sections expanded', () => {
       expect(component.sectionsCollapsed).toBeFalse();
-      expect(sectionItems().length).toBe(4);
+      expect(itemRows().length).toBe(4);
       expect(addItemRows().length).toBe(3);
     });
 
@@ -886,14 +956,14 @@ describe('ListComponent', () => {
         .queryAll(By.css('.button-row button'))
         .map((el) => el.query(By.css('mat-icon')).nativeElement.textContent.trim());
 
-      expect(buttons).toEqual(['share', 'unfold_less', 'add']);
+      expect(buttons).toEqual(['share', 'unfold_less', 'playlist_add_check', 'add']);
     });
 
     it('should collapse every section when clicked while expanded', () => {
       clickToggle();
 
       expect(component.sectionsCollapsed).toBeTrue();
-      expect(sectionItems().length).toBe(0);
+      expect(itemRows().length).toBe(0);
       expect(addItemRows().length).toBe(0);
     });
 
@@ -917,7 +987,7 @@ describe('ListComponent', () => {
       clickToggle();
 
       expect(component.sectionsCollapsed).toBeFalse();
-      expect(sectionItems().length).toBe(4);
+      expect(itemRows().length).toBe(4);
       expect(addItemRows().length).toBe(3);
       expect(toggleIconName()).toBe('unfold_less');
     });
@@ -927,6 +997,508 @@ describe('ListComponent', () => {
 
       expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
       expect(mockListService.updateSharedSectionItems).not.toHaveBeenCalled();
+    });
+  });
+
+  // --- checklist mode (F08) ---
+
+  describe('checklist mode', () => {
+    function toggleButton() {
+      return fixture.debugElement.query(By.css('.toggle-checklist'));
+    }
+
+    function clickToggle(): void {
+      toggleButton().nativeElement.click();
+      fixture.detectChanges();
+    }
+
+    function toggleIcon(): string {
+      return toggleButton().query(By.css('mat-icon')).nativeElement.textContent.trim();
+    }
+
+    function rowFor(name: string) {
+      return itemRows().find(
+        (el) => (el.nativeElement as HTMLElement).textContent!.trim() === name
+      )!;
+    }
+
+    /*
+      A click only carries where it was released, so the press has to be recorded
+      first — same coordinates means the pointer never moved: a tap. Moving more
+      than TAP_MOVE_TOLERANCE_PX is a drag that happened to end here.
+     */
+    function pressAndClick(name: string, movedBy = 0): void {
+      const row = rowFor(name);
+      row.triggerEventHandler('mousedown', { clientX: 40, clientY: 60 });
+      row.triggerEventHandler('click', { clientX: 40 + movedBy, clientY: 60 });
+      fixture.detectChanges();
+    }
+
+    it('should start with checklist mode off', () => {
+      expect(component.checklistMode).toBeFalse();
+    });
+
+    /*
+      Unlike collapse-all, whose icon swaps to name the next action, this icon is
+      fixed in both states — turning it into a two-state icon would leave the mode
+      announcing itself twice and contradicting aria-pressed.
+     */
+    it('should always offer the checklist icon', () => {
+      expect(toggleIcon()).toBe('playlist_add_check');
+
+      clickToggle();
+
+      expect(toggleIcon()).toBe('playlist_add_check');
+    });
+
+    it('should sit between the collapse and add buttons', () => {
+      const buttons = fixture.debugElement
+        .queryAll(By.css('.button-row button'))
+        .map((el) => el.query(By.css('mat-icon')).nativeElement.textContent.trim());
+
+      expect(buttons).toEqual(['share', 'unfold_less', 'playlist_add_check', 'add']);
+    });
+
+    it('should turn checklist mode on when clicked', () => {
+      clickToggle();
+
+      expect(component.checklistMode).toBeTrue();
+    });
+
+    it('should turn checklist mode off when clicked again', () => {
+      clickToggle();
+      clickToggle();
+
+      expect(component.checklistMode).toBeFalse();
+    });
+
+    /*
+      The button reports a state, not an action: unlike collapse-all its icon
+      never changes, so pressed-ness is the only thing that says the mode is on.
+     */
+    it('should report whether it is pressed', () => {
+      const button = toggleButton().nativeElement as HTMLElement;
+      expect(button.getAttribute('aria-pressed')).toBe('false');
+      expect(button.classList).not.toContain('active');
+
+      clickToggle();
+
+      expect(button.getAttribute('aria-pressed')).toBe('true');
+      expect(button.classList).toContain('active');
+    });
+
+    it('should name the action it performs', () => {
+      const button = toggleButton().nativeElement as HTMLElement;
+      expect(button.getAttribute('aria-label')).toBe('Turn checklist mode on');
+
+      clickToggle();
+
+      expect(button.getAttribute('aria-label')).toBe('Turn checklist mode off');
+    });
+
+    /* A view preference, like collapse-all: reopening the list starts it off. */
+    it('should not write the mode to the backend', () => {
+      clickToggle();
+
+      expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
+      expect(mockListService.updateSharedSectionItems).not.toHaveBeenCalled();
+    });
+
+    it('should mark an item tapped while the mode is on', () => {
+      clickToggle();
+
+      pressAndClick('Passport');
+
+      expect(component.list!.sections[1].items[0].checked).toBeTrue();
+      expect(rowFor('Passport').nativeElement.classList).toContain('ready');
+    });
+
+    /*
+      The `ready` class is not the requirement — "a light green row with bold
+      dark-green text" is, so this measures the paint instead of the class.
+      Material declares the label's colour and weight directly on the
+      `.mdc-list-item__primary-text` span it wraps the item name in, and a direct
+      declaration beats an inherited one: plain `color` / `font-weight` on the row
+      leave the text black at weight 400 while every class-based assertion still
+      passes. Only the tokens the span actually reads reach it.
+
+      Covers the resting state only. Karma cannot put the pointer on a row, so
+      nothing here exercises the :hover half of the rule or
+      --mdc-list-list-item-hover-label-text-color: deleting that token keeps this
+      suite green and turns a hovered mark's text black. Verifying it needs a real
+      browser — do not take the passing suite as licence to tidy the token away.
+     */
+    it('should paint a marked item green', () => {
+      clickToggle();
+
+      pressAndClick('Passport');
+
+      const row = rowFor('Passport').nativeElement as HTMLElement;
+      const text = row.querySelector('.mdc-list-item__primary-text');
+      expect(text).withContext('the span Material paints the label on').toBeTruthy();
+      expect(getComputedStyle(text!).color).toBe('rgb(46, 125, 50)');
+      expect(getComputedStyle(text!).fontWeight).toBe('600');
+      expect(getComputedStyle(row).backgroundColor).toBe('rgb(232, 245, 233)');
+    });
+
+    it('should save the mark on the item alone', () => {
+      clickToggle();
+
+      pressAndClick('Charger');
+
+      expect(mockListService.updateItemAt).toHaveBeenCalledOnceWith('list1', 's2', 1, {
+        name: 'Charger',
+        checked: true,
+      });
+      expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
+    });
+
+    it('should unmark an item tapped again', () => {
+      /*
+        The spy records the live Item, which toggleItemMark mutates in place, so
+        by assert time both recorded calls read as the final state — a plain
+        toHaveBeenCalledWith(checked: false) would pass even if the second write
+        never happened. Snapshot each write as it is made instead.
+       */
+      const writes: [string, string, number, Item][] = [];
+      mockListService.updateItemAt.and.callFake(
+        (listId, sectionId, index, item) => {
+          writes.push([listId, sectionId, index, { ...item }]);
+          return of(undefined);
+        }
+      );
+      clickToggle();
+
+      pressAndClick('Passport');
+      pressAndClick('Passport');
+
+      expect(component.list!.sections[1].items[0].checked).toBeFalse();
+      expect(writes).toEqual([
+        ['list1', 's1', 0, { name: 'Passport', checked: true }],
+        ['list1', 's1', 0, { name: 'Passport', checked: false }],
+      ]);
+      expect(rowFor('Passport').nativeElement.classList).not.toContain('ready');
+    });
+
+    it('should leave every other item alone', () => {
+      clickToggle();
+
+      pressAndClick('Passport');
+
+      expect(component.list!.sections[1].items[1].checked).toBeFalse();
+      expect(component.list!.sections[2].items.map((i) => i.checked)).toEqual([
+        false,
+        false,
+      ]);
+      expect(mockListService.updateItemAt).toHaveBeenCalledTimes(1);
+    });
+
+    /* Marks are saved data, so they stay on screen — only tapping is gated. */
+    it('should ignore a tap while the mode is off', () => {
+      pressAndClick('Passport');
+
+      expect(component.list!.sections[1].items[0].checked).toBeFalse();
+      expect(mockListService.updateItemAt).not.toHaveBeenCalled();
+    });
+
+    it('should keep showing a mark after the mode is turned off', () => {
+      clickToggle();
+      pressAndClick('Passport');
+
+      clickToggle();
+
+      expect(rowFor('Passport').nativeElement.classList).toContain('ready');
+    });
+
+    /*
+      Every item is a cdkDrag, so without TapGuard the click that ends a drag
+      would flip whatever it was dropped on.
+     */
+    it('should not mark an item when the click ends a drag', () => {
+      clickToggle();
+
+      pressAndClick('Passport', TAP_MOVE_TOLERANCE_PX + 1);
+
+      expect(component.list!.sections[1].items[0].checked).toBeFalse();
+      expect(mockListService.updateItemAt).not.toHaveBeenCalled();
+    });
+
+    /*
+      Called directly because no tap can produce this: a rendered row's index is
+      always in range for the array that rendered it. The guard exists for a
+      future caller that computes an index some other way, and this pins that such
+      a call returns quietly instead of throwing on `undefined.checked`.
+     */
+    it('should write nothing when the index is past the end of the section', () => {
+      clickToggle();
+      const section = component.list!.sections[1];
+      const press = { clientX: 40, clientY: 60 } as MouseEvent;
+
+      component.onItemPressStart(press);
+      expect(() =>
+        component.toggleItemMark(section, section.items.length, press)
+      ).not.toThrow();
+
+      expect(mockListService.updateItemAt).not.toHaveBeenCalled();
+      expect(mockListService.updateSharedItemAt).not.toHaveBeenCalled();
+    });
+
+    it('should save the mark on the shared node for a shared list', () => {
+      component.isShared = true;
+      clickToggle();
+
+      pressAndClick('Passport');
+
+      expect(mockListService.updateSharedItemAt).toHaveBeenCalledOnceWith(
+        'list1',
+        's1',
+        0,
+        { name: 'Passport', checked: true }
+      );
+      expect(mockListService.updateItemAt).not.toHaveBeenCalled();
+    });
+
+    /*
+      Adding an item rewrites the whole array, so the marks already on the section
+      have to survive that round trip — the new item starting unmarked is covered
+      by the plain onAddItemToSection specs above.
+     */
+    it('should keep existing marks when a new item is added', () => {
+      clickToggle();
+      pressAndClick('Passport');
+
+      component.onAddItemToSection('s1', 'Sunglasses');
+
+      expect(mockListService.updateSectionItems).toHaveBeenCalledWith('list1', 's1', [
+        { name: 'Passport', checked: true },
+        { name: 'Tickets', checked: false },
+        { name: 'Sunglasses', checked: false },
+      ]);
+    });
+
+    /*
+      The mark lives inside the item, so transferArrayItem carries it along.
+      Snapshotted writes — see recordItemWrites: dropItem hands the spy the live
+      section arrays it has just rearranged, so asserting on them afterwards
+      cannot see whether the transfer happened before the write or after it.
+     */
+    it('should keep a mark when the item is dragged to another section', () => {
+      clickToggle();
+      pressAndClick('Passport');
+      const writes = recordItemWrites(mockListService.updateSectionItems);
+
+      const sourceData = component.list!.sections[1].items;
+      const targetData = component.list!.sections[2].items;
+      component.dropItem({
+        previousIndex: 0,
+        currentIndex: 0,
+        previousContainer: { id: 'cdk-drop-list-section-s1', data: sourceData },
+        container: { id: 'cdk-drop-list-section-s2', data: targetData },
+      } as unknown as CdkDragDrop<any>);
+
+      expect(writes).toEqual([
+        ['list1', 's1', [{ name: 'Tickets', checked: false }]],
+        [
+          'list1',
+          's2',
+          [
+            { name: 'Passport', checked: true },
+            { name: 'Phone', checked: false },
+            { name: 'Charger', checked: false },
+          ],
+        ],
+      ]);
+    });
+  });
+
+  // --- unmark all (F08) ---
+
+  describe('unmark all', () => {
+    function unmarkButton() {
+      return fixture.debugElement.query(By.css('.unmark-all'));
+    }
+
+    function enterChecklistMode(): void {
+      fixture.debugElement.query(By.css('.toggle-checklist')).nativeElement.click();
+      fixture.detectChanges();
+    }
+
+    /* Marks two items directly: this block is about clearing them, not making them. */
+    function markPassportAndCharger(): void {
+      component.list!.sections[1].items[0].checked = true;
+      component.list!.sections[2].items[1].checked = true;
+      fixture.detectChanges();
+    }
+
+    function stubDialog(closesWith: boolean | undefined) {
+      const dialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
+      dialogRef.afterClosed.and.returnValue(of(closesWith));
+      return spyOn(component.dialog, 'open').and.returnValue(dialogRef);
+    }
+
+    it('should be absent while the mode is off, even with items marked', () => {
+      markPassportAndCharger();
+
+      expect(unmarkButton()).toBeNull();
+    });
+
+    /* Nothing to reset, so the header stays at four buttons. */
+    it('should be absent while nothing is marked', () => {
+      enterChecklistMode();
+
+      expect(unmarkButton()).toBeNull();
+    });
+
+    it('should appear once the mode is on and something is marked', () => {
+      markPassportAndCharger();
+      enterChecklistMode();
+
+      expect(unmarkButton()).not.toBeNull();
+      expect(
+        unmarkButton().query(By.css('mat-icon')).nativeElement.textContent.trim()
+      ).toBe('remove_done');
+    });
+
+    it('should ask before clearing, counting what is marked', () => {
+      markPassportAndCharger();
+      enterChecklistMode();
+      const open = stubDialog(false);
+
+      unmarkButton().nativeElement.click();
+
+      expect(open).toHaveBeenCalledWith(
+        DialogConfirmComponent,
+        jasmine.objectContaining({
+          data: {
+            heading: 'Unmark all items?',
+            message: '2 items are marked as ready.',
+            confirmLabel: 'Unmark all',
+          },
+        })
+      );
+    });
+
+    it('should count a single mark in the singular', () => {
+      component.list!.sections[1].items[0].checked = true;
+      fixture.detectChanges();
+      enterChecklistMode();
+      const open = stubDialog(false);
+
+      unmarkButton().nativeElement.click();
+
+      expect(open).toHaveBeenCalledWith(
+        DialogConfirmComponent,
+        jasmine.objectContaining({
+          data: jasmine.objectContaining({ message: '1 item is marked as ready.' }),
+        })
+      );
+    });
+
+    it('should clear every mark when confirmed', () => {
+      markPassportAndCharger();
+      enterChecklistMode();
+      stubDialog(true);
+
+      unmarkButton().nativeElement.click();
+      fixture.detectChanges();
+
+      const marks = component
+        .list!.sections.flatMap((s) => s.items)
+        .map((i) => i.checked);
+      expect(marks).toEqual([false, false, false, false]);
+      expect(unmarkButton()).toBeNull();
+    });
+
+    /*
+      One write per affected section, and nothing for the sections it did not
+      touch. Snapshotted writes — see recordItemWrites: unmarkAll clears the
+      flags on the same arrays it hands the spy, so asserting on them afterwards
+      would pass even if the writes had gone out with the marks still on.
+     */
+    it('should save only the sections that had a mark', () => {
+      const writes = recordItemWrites(mockListService.updateSectionItems);
+      markPassportAndCharger();
+      enterChecklistMode();
+      stubDialog(true);
+
+      unmarkButton().nativeElement.click();
+
+      expect(writes).toEqual([
+        [
+          'list1',
+          's1',
+          [
+            { name: 'Passport', checked: false },
+            { name: 'Tickets', checked: false },
+          ],
+        ],
+        [
+          'list1',
+          's2',
+          [
+            { name: 'Phone', checked: false },
+            { name: 'Charger', checked: false },
+          ],
+        ],
+      ]);
+    });
+
+    it('should change nothing when Cancel is pressed', () => {
+      markPassportAndCharger();
+      enterChecklistMode();
+      stubDialog(false);
+
+      unmarkButton().nativeElement.click();
+
+      expect(component.list!.sections[1].items[0].checked).toBeTrue();
+      expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
+    });
+
+    /*
+      A backdrop click or Escape closes with undefined rather than the false Cancel
+      sends, so "no" arrives here by two different routes — see
+      DialogConfirmComponent.onCancel for why the dismissal is left as undefined.
+     */
+    it('should change nothing when the dialog is dismissed', () => {
+      markPassportAndCharger();
+      enterChecklistMode();
+      stubDialog(undefined);
+
+      unmarkButton().nativeElement.click();
+
+      expect(component.list!.sections[1].items[0].checked).toBeTrue();
+      expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
+    });
+
+    /* Snapshotted writes for the same reason as the private-list spec above. */
+    it('should write to the shared node for a shared list', () => {
+      const writes = recordItemWrites(mockListService.updateSharedSectionItems);
+      component.isShared = true;
+      markPassportAndCharger();
+      enterChecklistMode();
+      stubDialog(true);
+
+      unmarkButton().nativeElement.click();
+
+      expect(writes).toEqual([
+        [
+          'list1',
+          's1',
+          [
+            { name: 'Passport', checked: false },
+            { name: 'Tickets', checked: false },
+          ],
+        ],
+        [
+          'list1',
+          's2',
+          [
+            { name: 'Phone', checked: false },
+            { name: 'Charger', checked: false },
+          ],
+        ],
+      ]);
+      expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
     });
   });
 

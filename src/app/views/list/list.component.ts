@@ -18,10 +18,15 @@ import {
   DialogAddGroupComponent,
 } from './dialog-add-group/dialog-add-group.component';
 import {
+  ConfirmDialogData,
+  DialogConfirmComponent,
+} from '../dialog-confirm/dialog-confirm.component';
+import {
   DialogRenameComponent,
   RenameDialogData,
 } from '../dialog-rename/dialog-rename.component';
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
+import { Item } from './item';
 import { ListService } from './list.service';
 import { Section } from './section';
 import { DRAG_START_DELAY } from '../drag-config';
@@ -50,6 +55,11 @@ export class ListComponent implements OnInit {
     reopening the list shows every section expanded again.
    */
   sectionsCollapsed = false;
+  /*
+    Also a view preference — the marks are persisted, the mode is not, so a list
+    always opens ready to read rather than ready to be tapped.
+   */
+  checklistMode = false;
   readonly dragStartDelay = DRAG_START_DELAY;
   currentUserUid: string | null = null;
   /*
@@ -61,6 +71,11 @@ export class ListComponent implements OnInit {
     Tells a tap on a section title from the click that ends a drag of its header.
    */
   private readonly titleTap = new TapGuard();
+  /*
+    Tells a tap on an item from the click that ends a drag of it. Items are
+    draggable, so without this a drop would flip whatever it landed on.
+   */
+  private readonly itemTap = new TapGuard();
 
   constructor(
     private route: ActivatedRoute,
@@ -128,6 +143,71 @@ export class ListComponent implements OnInit {
     this.sectionsCollapsed = !this.sectionsCollapsed;
   }
 
+  /*
+    The icon never changes: this button reports the mode you are in, and the
+    label is the only place the next action can be spelled out.
+   */
+  get toggleChecklistLabel(): string {
+    return this.checklistMode ? 'Turn checklist mode off' : 'Turn checklist mode on';
+  }
+
+  toggleChecklistMode(): void {
+    this.checklistMode = !this.checklistMode;
+  }
+
+  get markedCount(): number {
+    return (this.list?.sections ?? []).reduce(
+      (total, section) => total + section.items.filter((item) => item.checked).length,
+      0
+    );
+  }
+
+  /*
+    Only offered while there is something to clear, so the header keeps to at most
+    four buttons on a phone for all the time the answer would be "nothing
+    happened".
+   */
+  get canUnmarkAll(): boolean {
+    return this.checklistMode && this.markedCount > 0;
+  }
+
+  /*
+    Clears every mark on the list after asking. One write per section that had a
+    mark, not per item, and the sections it rewrites get their legacy string items
+    normalised on the way. A whole-array write carries the `checked` values this
+    client last read, so it can clobber a co-editor's mark — the reason a tap goes
+    through ListService.updateItemAt instead — but a bulk reset is rare and
+    deliberate, so that risk is worth taking once.
+   */
+  unmarkAll(): void {
+    if (!this.list) return;
+
+    const count = this.markedCount;
+    const data: ConfirmDialogData = {
+      heading: 'Unmark all items?',
+      message:
+        count === 1
+          ? '1 item is marked as ready.'
+          : `${count} items are marked as ready.`,
+      confirmLabel: 'Unmark all',
+    };
+    const dialogRef = this.dialog.open<DialogConfirmComponent, ConfirmDialogData, boolean>(
+      DialogConfirmComponent,
+      { width: '300px', data }
+    );
+
+    dialogRef.afterClosed().subscribe((confirmed: boolean | undefined) => {
+      if (!confirmed || !this.list) return;
+
+      this.list.sections
+        .filter((section) => section.items.some((item) => item.checked))
+        .forEach((section) => {
+          section.items.forEach((item) => (item.checked = false));
+          this.updateItems(section.id, section.items);
+        });
+    });
+  }
+
   openShareDialog(): void {
     if (!this.list) return;
     this.dialog.open(DialogShareListComponent, {
@@ -171,9 +251,39 @@ export class ListComponent implements OnInit {
     if (!this.list || !item.trim()) return;
     const section = this.list.sections.find((s) => s.id === sectionId);
     if (section) {
-      const updatedItems = [...section.items, item.trim()];
+      const updatedItems = [...section.items, { name: item.trim(), checked: false }];
       this.updateItems(sectionId, updatedItems);
     }
+  }
+
+  onItemPressStart(event: MouseEvent): void {
+    this.itemTap.press(event);
+  }
+
+  /*
+    Marks or unmarks one item. Off-mode taps do nothing at all: a mark is saved
+    data, so it stays on screen either way, and the mode only decides whether a
+    tap may change it. Only the tapped item is written — see
+    ListService.updateItemAt.
+   */
+  toggleItemMark(section: Section, index: number, event: MouseEvent): void {
+    if (!this.list || !this.checklistMode) return;
+    if (!this.itemTap.isTap(event)) return;
+
+    /*
+      `index` comes from the row that was rendered, so it is in range for the
+      array that produced it; this only stops a stale index from a future caller
+      becoming a TypeError. The real index-as-path race — a stale index landing
+      on the wrong item — is ListService.updateItemAt's, and documented there.
+     */
+    const item = section.items[index];
+    if (!item) return;
+
+    item.checked = !item.checked;
+    const obs = this.isShared
+      ? this.listService.updateSharedItemAt(this.list.id, section.id, index, item)
+      : this.listService.updateItemAt(this.list.id, section.id, index, item);
+    obs.subscribe();
   }
 
   renameLabel(section: Section): string {
@@ -232,7 +342,7 @@ export class ListComponent implements OnInit {
     }
   }
 
-  dropItem(event: CdkDragDrop<string[]>): void {
+  dropItem(event: CdkDragDrop<Item[]>): void {
     if (event.previousContainer === event.container) {
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
     } else {
@@ -264,7 +374,7 @@ export class ListComponent implements OnInit {
     return ['trash-list', ...otherIds];
   }
 
-  private updateItems(sectionId: string, items: string[]): void {
+  private updateItems(sectionId: string, items: Item[]): void {
     if (!this.list) return;
     const obs = this.isShared
       ? this.listService.updateSharedSectionItems(this.list.id, sectionId, items)

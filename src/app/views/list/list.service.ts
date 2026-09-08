@@ -5,6 +5,7 @@ import { map, take } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { Group } from '../group/group';
 import { List } from '../lists/list';
+import { Item, parseItems, unmarkedItems } from './item';
 import { Section } from './section';
 
 export const UNGROUPED_SECTION_TITLE = 'Ungrouped';
@@ -29,7 +30,7 @@ export class ListService {
     const sections = Object.keys(sectionsObj).map((key) => ({
       id: key,
       title: sectionsObj[key]?.title ?? 'Untitled',
-      items: sectionsObj[key]?.items ?? [],
+      items: parseItems(sectionsObj[key]?.items),
       sourceGroupId: sectionsObj[key]?.sourceGroupId,
     }));
     // Ensure "Ungrouped" section is always first
@@ -129,7 +130,7 @@ export class ListService {
         if (!path) return of(null);
         const sectionData = {
           title: group.title,
-          items: [...group.items],
+          items: unmarkedItems(group.items),
           sourceGroupId: group.id,
         };
         return from(
@@ -171,7 +172,7 @@ export class ListService {
   updateSectionItems(
     listId: string,
     sectionId: string,
-    items: string[]
+    items: Item[]
   ): Observable<void> {
     return this.userPath().pipe(
       take(1),
@@ -181,6 +182,48 @@ export class ListService {
           this.db
             .object(`${path}/lists/${listId}/sections/${sectionId}`)
             .update({ items })
+        );
+      })
+    );
+  }
+
+  /*
+    Two people ticking off different items in the same section is the common
+    case in checklist mode, and a whole-array write — what every other edit
+    does — carries whatever `checked` values were already in memory before
+    someone else's latest write landed. Doing that on every tap would let each
+    participant's read-modify-write clobber the other's mark on essentially
+    every tap. Writing one item at its own index touches only that path:
+    marking different items touches disjoint paths and can't conflict, and
+    two people marking the same item write the same value.
+
+    This does not make marking safe outright, only safe against mark-vs-mark.
+    `index` is a position into parseItems' output, not a stable identity, and
+    it addresses the stored node directly — valid only while item nodes stay
+    dense. If a co-editor deletes or reorders items between this client's read
+    and this write, the index is now a stale bet: it can land on the wrong
+    item, or past the end of a shorter array and leave a sparse node (see
+    parseItems). That residual race self-heals on the next add, delete, reorder
+    or unmark-all, since those rewrite the whole array.
+
+    `set` rather than `update` because a section written before F08 still holds a
+    bare string at this path, and `update` on a string node would replace it with
+    `{ checked }` and lose the name.
+   */
+  updateItemAt(
+    listId: string,
+    sectionId: string,
+    index: number,
+    item: Item
+  ): Observable<void> {
+    return this.userPath().pipe(
+      take(1),
+      switchMap((path) => {
+        if (!path) return of(undefined as void);
+        return from(
+          this.db
+            .object(`${path}/lists/${listId}/sections/${sectionId}/items/${index}`)
+            .set(item)
         );
       })
     );
@@ -231,12 +274,30 @@ export class ListService {
   updateSharedSectionItems(
     listId: string,
     sectionId: string,
-    items: string[]
+    items: Item[]
   ): Observable<void> {
     return from(
       this.db
         .object(`sharedLists/${listId}/sections/${sectionId}`)
         .update({ items })
+    );
+  }
+
+  /*
+    No take(1): the shared node is addressed by list id alone, so this never
+    reads the long-lived user$ stream. See updateItemAt for why it sets the whole
+    item.
+   */
+  updateSharedItemAt(
+    listId: string,
+    sectionId: string,
+    index: number,
+    item: Item
+  ): Observable<void> {
+    return from(
+      this.db
+        .object(`sharedLists/${listId}/sections/${sectionId}/items/${index}`)
+        .set(item)
     );
   }
 
@@ -259,7 +320,7 @@ export class ListService {
   addSharedSectionToList(listId: string, group: Group): Observable<string | null> {
     const sectionData = {
       title: group.title,
-      items: [...group.items],
+      items: unmarkedItems(group.items),
       sourceGroupId: group.id,
     };
     return from(

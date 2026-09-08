@@ -12,10 +12,12 @@ interface PointerPosition {
 }
 
 /*
-  Tells a tap from the click that ends a drag, for a tappable element that also
-  lives inside a cdkDragHandle — a section title, a group title. CDK prevents the
-  default on a mouse move but that does not suppress the following click, so a
-  header dragged a few pixels would otherwise fire the tap handler on release.
+  Tells a tap from the click that ends a drag, for a tappable element that a drag
+  can also start from: either one inside a cdkDragHandle — a section title, a
+  group title — or the cdkDrag element itself, as a list item row is. CDK
+  prevents the default on a mouse move but that does not suppress the following
+  click, so an element dragged a few pixels would otherwise fire the tap handler
+  on release.
 
   Deliberately derived from the pointer position rather than from a flag toggled
   by cdkDragStarted/cdkDragEnded: a card dropped on the trash can be gone from
