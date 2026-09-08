@@ -3,6 +3,7 @@ import { AngularFireDatabase } from '@angular/fire/compat/database';
 import { Observable, forkJoin, from, of, throwError } from 'rxjs';
 import { map, switchMap, take } from 'rxjs/operators';
 import { List } from '../views/lists/list';
+import { parseItems } from '../views/list/item';
 import { Section } from '../views/list/section';
 import { AuthService } from './auth.service';
 
@@ -27,7 +28,7 @@ export class ShareService {
     return Object.keys(sectionsObj).map((key) => ({
       id: key,
       title: sectionsObj[key]?.title ?? 'Untitled',
-      items: sectionsObj[key]?.items ?? [],
+      items: parseItems(sectionsObj[key]?.items),
       sourceGroupId: sectionsObj[key]?.sourceGroupId,
     }));
   }

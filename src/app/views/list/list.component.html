@@ -92,7 +92,7 @@
             [cdkDragData]="{ type: 'item', sectionId: section.id }"
             [cdkDragStartDelay]="dragStartDelay"
             *ngFor="let item of section.items"
-          >{{ item }}</mat-list-item>
+          >{{ item.name }}</mat-list-item>
         </mat-list>
         <div class="add-item-row">
           <input

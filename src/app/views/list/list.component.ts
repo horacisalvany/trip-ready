@@ -22,6 +22,7 @@ import {
   RenameDialogData,
 } from '../dialog-rename/dialog-rename.component';
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
+import { Item } from './item';
 import { ListService } from './list.service';
 import { Section } from './section';
 import { DRAG_START_DELAY } from '../drag-config';
@@ -171,7 +172,7 @@ export class ListComponent implements OnInit {
     if (!this.list || !item.trim()) return;
     const section = this.list.sections.find((s) => s.id === sectionId);
     if (section) {
-      const updatedItems = [...section.items, item.trim()];
+      const updatedItems = [...section.items, { name: item.trim(), checked: false }];
       this.updateItems(sectionId, updatedItems);
     }
   }
@@ -232,7 +233,7 @@ export class ListComponent implements OnInit {
     }
   }
 
-  dropItem(event: CdkDragDrop<string[]>): void {
+  dropItem(event: CdkDragDrop<Item[]>): void {
     if (event.previousContainer === event.container) {
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
     } else {
@@ -264,7 +265,7 @@ export class ListComponent implements OnInit {
     return ['trash-list', ...otherIds];
   }
 
-  private updateItems(sectionId: string, items: string[]): void {
+  private updateItems(sectionId: string, items: Item[]): void {
     if (!this.list) return;
     const obs = this.isShared
       ? this.listService.updateSharedSectionItems(this.list.id, sectionId, items)

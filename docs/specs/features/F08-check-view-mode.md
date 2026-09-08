@@ -119,8 +119,8 @@ normalises any legacy strings in those sections.
 - `src/app/views/list/list.component.ts` / `.html` / `.scss` — mode toggle, item tap, marked
   style, unmark-all
 - `src/app/views/dialog-confirm/` (new) — small confirmation dialog, sibling of `dialog-rename`
-- `src/app/services/share.service.ts` — its `parseSections` passes items through opaquely, so a
-  publish/unshare round-trip already preserves marks; only the type changes
+- `src/app/services/share.service.ts` — its `parseSections` calls the same normaliser as
+  `ListService.parseSections`, so a bare legacy string reads as unmarked here too
 - `docs/specs/spec.md` — one bullet under **Lists**
 
 ### Tests

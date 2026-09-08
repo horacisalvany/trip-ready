@@ -5,6 +5,7 @@ import { map, take } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { Group } from '../group/group';
 import { List } from '../lists/list';
+import { Item, parseItems, unmarkedItems } from './item';
 import { Section } from './section';
 
 export const UNGROUPED_SECTION_TITLE = 'Ungrouped';
@@ -29,7 +30,7 @@ export class ListService {
     const sections = Object.keys(sectionsObj).map((key) => ({
       id: key,
       title: sectionsObj[key]?.title ?? 'Untitled',
-      items: sectionsObj[key]?.items ?? [],
+      items: parseItems(sectionsObj[key]?.items),
       sourceGroupId: sectionsObj[key]?.sourceGroupId,
     }));
     // Ensure "Ungrouped" section is always first
@@ -129,7 +130,7 @@ export class ListService {
         if (!path) return of(null);
         const sectionData = {
           title: group.title,
-          items: [...group.items],
+          items: unmarkedItems(group.items),
           sourceGroupId: group.id,
         };
         return from(
@@ -171,7 +172,7 @@ export class ListService {
   updateSectionItems(
     listId: string,
     sectionId: string,
-    items: string[]
+    items: Item[]
   ): Observable<void> {
     return this.userPath().pipe(
       take(1),
@@ -231,7 +232,7 @@ export class ListService {
   updateSharedSectionItems(
     listId: string,
     sectionId: string,
-    items: string[]
+    items: Item[]
   ): Observable<void> {
     return from(
       this.db
@@ -259,7 +260,7 @@ export class ListService {
   addSharedSectionToList(listId: string, group: Group): Observable<string | null> {
     const sectionData = {
       title: group.title,
-      items: [...group.items],
+      items: unmarkedItems(group.items),
       sourceGroupId: group.id,
     };
     return from(

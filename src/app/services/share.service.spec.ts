@@ -295,6 +295,14 @@ describe('ShareService', () => {
         expect(lists[0].isShared).toBeTrue();
         expect(lists[0].sections.length).toBe(1);
         expect(lists[0].sections[0].title).toBe('Essentials');
+        /*
+          The same normalisation ListService applies on read: a bare string
+          from before F08 becomes an unmarked Item, not a string that happens
+          to be typed Item[].
+         */
+        expect(lists[0].sections[0].items).toEqual([
+          { name: 'sunscreen', checked: false },
+        ]);
         expect(lists[1].id).toBe('list2');
         expect(lists[1].title).toBe('Mountain Trip');
         expect(lists[1].isShared).toBeTrue();

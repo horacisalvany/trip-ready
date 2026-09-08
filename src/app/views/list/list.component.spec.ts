@@ -18,18 +18,38 @@ import { AuthService } from '../../services/auth.service';
 import { Group } from '../group/group';
 import { List } from '../lists/list';
 import { Section } from './section';
+import { Item, unmarkedItems } from './item';
 import { expectAllDragsHaveStartDelay } from '../drag-config.spec-helper';
 
 const MOCK_SECTIONS: Section[] = [
   { id: 'ungrouped', title: UNGROUPED_SECTION_TITLE, items: [] },
-  { id: 's1', title: 'Packing', items: ['Passport', 'Tickets'], sourceGroupId: 'g1' },
-  { id: 's2', title: 'Electronics', items: ['Phone', 'Charger'], sourceGroupId: 'g3' },
+  {
+    id: 's1',
+    title: 'Packing',
+    items: unmarkedItems(['Passport', 'Tickets']),
+    sourceGroupId: 'g1',
+  },
+  {
+    id: 's2',
+    title: 'Electronics',
+    items: unmarkedItems(['Phone', 'Charger']),
+    sourceGroupId: 'g3',
+  },
 ];
+
+/*
+  A fresh copy for every consumer. Items are objects now, so spreading the array
+  alone would share the item references: one test marking an item would mutate
+  MOCK_SECTIONS and leak into the next.
+ */
+function copySections(sections: Section[]): Section[] {
+  return sections.map((s) => ({ ...s, items: s.items.map((i) => ({ ...i })) }));
+}
 
 const MOCK_LIST: List = {
   id: 'list1',
   title: 'Paris Trip',
-  sections: MOCK_SECTIONS.map((s) => ({ ...s, items: [...s.items] })),
+  sections: copySections(MOCK_SECTIONS),
 };
 
 const MOCK_GROUPS: Group[] = [
@@ -68,17 +88,16 @@ describe('ListComponent', () => {
       'renameSharedSection',
     ]);
     mockListService.getList.and.returnValue(
-      of({
-        ...MOCK_LIST,
-        sections: MOCK_LIST.sections.map((s) => ({ ...s, items: [...s.items] })),
-      })
+      of({ ...MOCK_LIST, sections: copySections(MOCK_LIST.sections) })
     );
     mockListService.addSectionToList.and.returnValue(of('newSectionId'));
     mockListService.addEmptySectionToList.and.returnValue(of('newSectionId'));
     mockListService.removeSectionFromList.and.returnValue(of(undefined));
     mockListService.updateSectionItems.and.returnValue(of(undefined));
     mockListService.renameSection.and.returnValue(of(undefined));
-    mockListService.getSharedList.and.returnValue(of({...MOCK_LIST, isShared: true, sections: MOCK_LIST.sections.map(s => ({...s, items: [...s.items]}))}));
+    mockListService.getSharedList.and.returnValue(
+      of({ ...MOCK_LIST, isShared: true, sections: copySections(MOCK_LIST.sections) })
+    );
     mockListService.addSharedSectionToList.and.returnValue(of('newSectionId'));
     mockListService.addEmptySharedSectionToList.and.returnValue(of('newSectionId'));
     mockListService.updateSharedSectionItems.and.returnValue(of(undefined));
@@ -141,7 +160,7 @@ describe('ListComponent', () => {
     expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
       'list1',
       's1',
-      ['Passport', 'Tickets', 'Sunglasses']
+      unmarkedItems(['Passport', 'Tickets', 'Sunglasses'])
     );
   });
 
@@ -151,7 +170,7 @@ describe('ListComponent', () => {
     expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
       'list1',
       's1',
-      ['Passport', 'Tickets', 'Hat']
+      unmarkedItems(['Passport', 'Tickets', 'Hat'])
     );
   });
 
@@ -371,7 +390,7 @@ describe('ListComponent', () => {
     expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
       'list1',
       's1',
-      ['Tickets']
+      unmarkedItems(['Tickets'])
     );
   });
 
@@ -388,7 +407,7 @@ describe('ListComponent', () => {
     expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
       'list1',
       's2',
-      ['Phone']
+      unmarkedItems(['Phone'])
     );
   });
 
@@ -415,14 +434,14 @@ describe('ListComponent', () => {
       currentIndex: 1,
       previousContainer: { id: 'cdk-drop-list-section-s1', data: containerData },
       container: { id: 'cdk-drop-list-section-s1', data: containerData },
-    } as unknown as CdkDragDrop<string[]>;
+    } as unknown as CdkDragDrop<Item[]>;
 
     component.dropItem(event);
 
     expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
       'list1',
       's1',
-      ['Tickets', 'Passport']
+      unmarkedItems(['Tickets', 'Passport'])
     );
   });
 
@@ -434,7 +453,7 @@ describe('ListComponent', () => {
       currentIndex: 1,
       previousContainer: { id: 'cdk-drop-list-section-s1', data: sourceData },
       container: { id: 'cdk-drop-list-section-s2', data: targetData },
-    } as unknown as CdkDragDrop<string[]>;
+    } as unknown as CdkDragDrop<Item[]>;
 
     component.dropItem(event);
 
@@ -442,13 +461,43 @@ describe('ListComponent', () => {
     expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
       'list1',
       's1',
-      ['Tickets']
+      unmarkedItems(['Tickets'])
     );
     // Target section updated (item added)
     expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
       'list1',
       's2',
-      ['Phone', 'Passport', 'Charger']
+      unmarkedItems(['Phone', 'Passport', 'Charger'])
+    );
+  });
+
+  /*
+    Acceptance criterion: "An item keeps its mark when dragged to another
+    section." transferArrayItem moves the whole Item object rather than
+    rebuilding it, so the mark should ride along untouched.
+   */
+  it('should keep a mark when the item is dragged to another section', () => {
+    const sourceData = component.list!.sections[1].items; // s1: Packing
+    const targetData = component.list!.sections[2].items; // s2: Electronics
+    sourceData[0].checked = true; // Passport marked ready before the drag
+
+    const event = {
+      previousIndex: 0,
+      currentIndex: 1,
+      previousContainer: { id: 'cdk-drop-list-section-s1', data: sourceData },
+      container: { id: 'cdk-drop-list-section-s2', data: targetData },
+    } as unknown as CdkDragDrop<Item[]>;
+
+    component.dropItem(event);
+
+    expect(mockListService.updateSectionItems).toHaveBeenCalledWith(
+      'list1',
+      's2',
+      [
+        { name: 'Phone', checked: false },
+        { name: 'Passport', checked: true },
+        { name: 'Charger', checked: false },
+      ]
     );
   });
 
@@ -601,10 +650,7 @@ describe('ListComponent', () => {
       produce both, and must not disturb the sections already on the list.
      */
     it('should create the typed section alongside the selected group sections', () => {
-      const sectionsBefore = component.list!.sections.map((s) => ({
-        ...s,
-        items: [...s.items],
-      }));
+      const sectionsBefore = copySections(component.list!.sections);
 
       closeDialogWith(dialogResult([MOCK_GROUPS[1]], 'Beach gear'));
 
@@ -748,8 +794,14 @@ describe('ListComponent', () => {
   // --- shared-with info tooltip ---
 
   describe('shared-with info icon', () => {
+    /*
+      Clones sections before assigning, not just the list wrapper: every
+      caller spreads MOCK_LIST, and a shallow spread still shares its sections
+      array and every Item object. Without this a test that marks an item
+      would mutate MOCK_LIST for every test that runs after it.
+     */
     function setList(list: List): void {
-      component.list = list;
+      component.list = { ...list, sections: copySections(list.sections) };
       fixture.detectChanges();
     }
 
@@ -802,8 +854,14 @@ describe('ListComponent', () => {
   // --- share button visibility (owner-only sharing) ---
 
   describe('share button', () => {
+    /*
+      Clones sections before assigning, not just the list wrapper: every
+      caller spreads MOCK_LIST, and a shallow spread still shares its sections
+      array and every Item object. Without this a test that marks an item
+      would mutate MOCK_LIST for every test that runs after it.
+     */
     function setList(list: List): void {
-      component.list = list;
+      component.list = { ...list, sections: copySections(list.sections) };
       fixture.detectChanges();
     }
 
