@@ -67,6 +67,11 @@ export class ListComponent implements OnInit {
     Tells a tap on a section title from the click that ends a drag of its header.
    */
   private readonly titleTap = new TapGuard();
+  /*
+    Tells a tap on an item from the click that ends a drag of it. Items are
+    draggable, so without this a drop would flip whatever it landed on.
+   */
+  private readonly itemTap = new TapGuard();
 
   constructor(
     private route: ActivatedRoute,
@@ -192,6 +197,36 @@ export class ListComponent implements OnInit {
       const updatedItems = [...section.items, { name: item.trim(), checked: false }];
       this.updateItems(sectionId, updatedItems);
     }
+  }
+
+  onItemPressStart(event: MouseEvent): void {
+    this.itemTap.press(event);
+  }
+
+  /*
+    Marks or unmarks one item. Off-mode taps do nothing at all: a mark is saved
+    data, so it stays on screen either way, and the mode only decides whether a
+    tap may change it. Only the tapped item is written — see
+    ListService.updateItemAt.
+   */
+  toggleItemMark(section: Section, index: number, event: MouseEvent): void {
+    if (!this.list || !this.checklistMode) return;
+    if (!this.itemTap.isTap(event)) return;
+
+    /*
+      `index` comes from the row that was rendered, so it is in range for the
+      array that produced it; this only stops a stale index from a future caller
+      becoming a TypeError. The real index-as-path race — a stale index landing
+      on the wrong item — is ListService.updateItemAt's, and documented there.
+     */
+    const item = section.items[index];
+    if (!item) return;
+
+    item.checked = !item.checked;
+    const obs = this.isShared
+      ? this.listService.updateSharedItemAt(this.list.id, section.id, index, item)
+      : this.listService.updateItemAt(this.list.id, section.id, index, item);
+    obs.subscribe();
   }
 
   renameLabel(section: Section): string {

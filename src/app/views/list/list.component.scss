@@ -101,3 +101,25 @@ mat-list-item[cdkDrag] {
   background: #3f51b5;
   color: #fff;
 }
+
+/*
+  A ready item is a green row and nothing else — no tick, no checkbox. A section
+  card is ~181px wide on a phone and long names are already truncated, so any
+  glyph would be paid for in item text.
+
+  Colour and weight go through MDC's tokens because Material declares both
+  directly on the `.mdc-list-item__primary-text` span it wraps the name in, and a
+  direct declaration beats one inherited from this element: plain `color` here
+  never reaches the text. Neither that class nor these token names is public API,
+  which is why the spec asserts the computed result rather than the rule. The
+  :hover half of the selector is what beats `mat-list-item:hover` in
+  _shared-card.scss, on specificity rather than on source order, and it carries
+  the separate token Material repaints the label from under the pointer.
+ */
+mat-list-item.ready,
+mat-list-item.ready:hover {
+  --mdc-list-list-item-label-text-color: #2e7d32;
+  --mdc-list-list-item-hover-label-text-color: #2e7d32;
+  --mdc-list-list-item-label-text-weight: 600;
+  background-color: #e8f5e9;
+}
