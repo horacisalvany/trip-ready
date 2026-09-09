@@ -70,3 +70,11 @@
 </div>
 
 <router-outlet></router-outlet>
+
+<!--
+  After the router outlet, so it sits at the end of whichever view is active.
+  Deliberately not pinned to the bottom of the viewport: a fixed footer would
+  permanently cost ~28px of a phone screen, and screen height is exactly what is
+  scarce on the list view.
+-->
+<footer class="app-footer" role="contentinfo">© {{ currentYear }} TripReady</footer>

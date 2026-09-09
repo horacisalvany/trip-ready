@@ -7,4 +7,6 @@ import { Component } from '@angular/core';
 })
 export class AppComponent {
   title = 'tripReady';
+  /* Read from the clock rather than hardcoded, so it does not go stale in January. */
+  readonly currentYear = new Date().getFullYear();
 }

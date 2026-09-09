@@ -30,4 +30,12 @@ describe('AppComponent', () => {
       'TripReady'
     );
   });
+
+  it('should render a footer with the current year', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    const footer = (fixture.nativeElement as HTMLElement).querySelector('footer');
+
+    expect(footer?.textContent).toContain(`© ${new Date().getFullYear()} TripReady`);
+  });
 });
