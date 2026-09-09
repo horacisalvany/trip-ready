@@ -15,6 +15,7 @@ import {
 } from '../dialog-rename/dialog-rename.component';
 import { DRAG_START_DELAY } from '../drag-config';
 import { TapGuard } from '../tap-guard';
+import { trackById } from '../track-by';
 
 @Component({
   selector: 'group',
@@ -29,6 +30,12 @@ export class GroupComponent implements OnInit {
    */
   groupsCollapsed = false;
   readonly dragStartDelay = DRAG_START_DELAY;
+  /*
+    Group cards are rebuilt on every emission without this. The items inside a
+    card need nothing: they are still plain strings, so identity tracking already
+    compares them by value and reuses the rows. See track-by.ts.
+   */
+  readonly trackByGroupId = trackById;
   /*
     Boolean to control that something has been dropped. Without there are bugs like missclicks after you drop a list on the trash
     and the popup of add a new list is opened for no reason.

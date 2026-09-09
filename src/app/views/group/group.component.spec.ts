@@ -612,4 +612,21 @@ describe('GroupComponent', () => {
       .withContext('rule lives in src/styles.scss')
       .toBe('text');
   });
+
+  // --- rows survive an update (F09) ---
+
+  it('keeps a group card, and what was typed into it, when the groups re-emit', () => {
+    const input = fixture.debugElement.query(By.css('.add-item-row input'))
+      .nativeElement as HTMLInputElement;
+    input.value = 'half typed';
+
+    component.groups = MOCK_GROUPS.map((g) => ({ ...g, items: [...g.items] }));
+    fixture.detectChanges();
+
+    const after = fixture.debugElement.query(By.css('.add-item-row input'))
+      .nativeElement as HTMLInputElement;
+
+    expect(after).toBe(input);
+    expect(after.value).toBe('half typed');
+  });
 });
