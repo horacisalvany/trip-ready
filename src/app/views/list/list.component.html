@@ -73,7 +73,11 @@
     [cdkDropListSortingDisabled]="true"
   >
     <div
-      *ngFor="let section of list?.sections; let i = index"
+      *ngFor="
+        let section of list?.sections;
+        let i = index;
+        trackBy: trackBySectionId
+      "
       class="col-6 col-md-4"
       cdkDrag
       [cdkDragData]="{ type: 'section', id: section.id }"
@@ -112,7 +116,11 @@
             cdkDrag
             [cdkDragData]="{ type: 'item', sectionId: section.id }"
             [cdkDragStartDelay]="dragStartDelay"
-            *ngFor="let item of section.items; let itemIndex = index"
+            *ngFor="
+              let item of section.items;
+              let itemIndex = index;
+              trackBy: trackByItemIndex
+            "
             [class.ready]="item.checked"
             (mousedown)="onItemPressStart($event)"
             (click)="toggleItemMark(section, itemIndex, $event)"

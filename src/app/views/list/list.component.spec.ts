@@ -1687,4 +1687,56 @@ describe('ListComponent', () => {
       expect(mockListService.renameSection).not.toHaveBeenCalled();
     });
   });
+
+  // --- rows survive an update (F09) ---
+
+  /*
+    Karma renders real DOM, and trackBy depends only on what is assigned to
+    `component.list`, not on the stream that produced it — so re-assigning a
+    fresh copy is a faithful stand-in for a Firebase emission. Asserting on the
+    rendered text would pass either way; node identity is what tells the two
+    apart.
+   */
+  describe('rows survive an update', () => {
+    function reEmitList(): void {
+      component.list = { ...MOCK_LIST, sections: copySections(MOCK_LIST.sections) };
+      fixture.detectChanges();
+    }
+
+    it('keeps a section card, and what was typed into it, when the list re-emits', () => {
+      const input = fixture.debugElement.query(By.css('.add-item-row input'))
+        .nativeElement as HTMLInputElement;
+      input.value = 'half typed';
+
+      reEmitList();
+
+      const after = fixture.debugElement.query(By.css('.add-item-row input'))
+        .nativeElement as HTMLInputElement;
+
+      expect(after).toBe(input);
+      expect(after.value).toBe('half typed');
+    });
+
+    it('keeps the item rows when the list re-emits', () => {
+      const before = fixture.debugElement
+        .queryAll(By.css('mat-list-item'))
+        .map((row) => row.nativeElement);
+
+      expect(before.length).toBeGreaterThan(0);
+
+      reEmitList();
+
+      const after = fixture.debugElement
+        .queryAll(By.css('mat-list-item'))
+        .map((row) => row.nativeElement);
+
+      /*
+        Element by element, and never toEqual: Jasmine deep-compares DOM nodes
+        structurally, so two freshly built rows holding the same text match and
+        the assertion passes without trackBy doing anything.
+       */
+      expect(after.length).toBe(before.length);
+      after.forEach((row, i) => expect(row).toBe(before[i]));
+    });
+  });
 });
