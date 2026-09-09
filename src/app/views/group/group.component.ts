@@ -16,6 +16,7 @@ import {
 import { DRAG_START_DELAY } from '../drag-config';
 import { TapGuard } from '../tap-guard';
 import { trackById } from '../track-by';
+import { keepInView } from '../keep-in-view';
 
 @Component({
   selector: 'group',
@@ -137,12 +138,18 @@ export class GroupComponent implements OnInit {
     this.updateFirebase(group.id, group.items);
   }
 
-  onAdd(index: number, input: HTMLInputElement) {
+  /*
+    `itemRow` is optional so a caller that has no element to keep on screen — a
+    unit test, or a future non-template caller — still compiles.
+   */
+  onAdd(index: number, input: HTMLInputElement, itemRow?: HTMLElement) {
     const value = input.value.trim();
     if (!value) return;
     const group = this.groups[index];
     group.items.push(value);
     this.updateFirebase(group.id, group.items);
+    // The new item pushes this row down; bring it back if it fell off screen.
+    keepInView(itemRow);
   }
 
   /*

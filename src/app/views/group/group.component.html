@@ -73,17 +73,17 @@
             *ngFor="let item of group.items"
             >{{ item }}</mat-list-item
           >
-          <div class="add-item-row">
+          <div class="add-item-row" #addItemRow>
             <input
               #itemInput
               type="text"
               maxlength="40"
               placeholder="New item..."
-              (keyup.enter)="onAdd(i, itemInput); itemInput.value = ''"
+              (keyup.enter)="onAdd(i, itemInput, addItemRow); itemInput.value = ''"
             />
             <button
               mat-icon-button
-              (click)="onAdd(i, itemInput); itemInput.value = ''"
+              (click)="onAdd(i, itemInput, addItemRow); itemInput.value = ''"
             >
               <mat-icon>add</mat-icon>
             </button>

@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -88,6 +88,41 @@ describe('GroupComponent', () => {
 
     expect(mockGroupService.updateGroup).not.toHaveBeenCalled();
   });
+
+  // --- keeping the "New item..." row in view (F11) ---
+
+  /*
+    Driven through the DOM rather than by calling onAdd directly, because the
+    element being scrolled comes from a template ref — calling the method by
+    hand would not prove the template passes it.
+   */
+  it('scrolls the "New item..." row back into view after adding an item', fakeAsync(() => {
+    const row = fixture.debugElement.queryAll(By.css('.add-item-row'))[0]
+      .nativeElement as HTMLElement;
+    const input = row.querySelector('input') as HTMLInputElement;
+    const scrollIntoView = spyOn(row, 'scrollIntoView');
+
+    input.value = 'Socks';
+    input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter' }));
+    fixture.detectChanges();
+    tick();
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+  }));
+
+  it('does not scroll when nothing is added', fakeAsync(() => {
+    const row = fixture.debugElement.queryAll(By.css('.add-item-row'))[0]
+      .nativeElement as HTMLElement;
+    const input = row.querySelector('input') as HTMLInputElement;
+    const scrollIntoView = spyOn(row, 'scrollIntoView');
+
+    input.value = '   ';
+    input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter' }));
+    fixture.detectChanges();
+    tick();
+
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  }));
 
   // --- onDelete ---
 
