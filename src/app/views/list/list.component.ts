@@ -8,9 +8,11 @@ import {
 } from '@angular/cdk/drag-drop';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
+import { Observable, forkJoin, of } from 'rxjs';
 import { take } from 'rxjs/operators';
 import { MaterialModule } from 'src/app/material.module';
 import { AuthService } from '../../services/auth.service';
+import { WriteFeedbackService } from '../../services/write-feedback.service';
 import { GroupService } from '../group/group.service';
 import { List } from '../lists/list';
 import {
@@ -97,7 +99,8 @@ export class ListComponent implements OnInit {
     public dialog: MatDialog,
     private listService: ListService,
     private groupService: GroupService,
-    private authService: AuthService
+    private authService: AuthService,
+    private writeFeedback: WriteFeedbackService
   ) {}
 
   ngOnInit(): void {
@@ -222,12 +225,20 @@ export class ListComponent implements OnInit {
     dialogRef.afterClosed().subscribe((confirmed: boolean | undefined) => {
       if (!confirmed || !this.list) return;
 
-      this.list.sections
+      /*
+        One write per marked section, but one message: the user asked to clear
+        the list once, so six failing sections are one piece of bad news.
+       */
+      const writes = this.list.sections
         .filter((section) => section.items.some((item) => item.checked))
-        .forEach((section) => {
+        .map((section) => {
           section.items.forEach((item) => (item.checked = false));
-          this.updateItems(section.id, section.items);
+          return this.updateItems(section.id, section.items);
         });
+
+      if (writes.length) {
+        this.writeFeedback.report(forkJoin(writes), 'the cleared marks');
+      }
     });
   }
 
@@ -250,22 +261,36 @@ export class ListComponent implements OnInit {
       dialogRef.afterClosed().subscribe((result: AddSectionsResult | undefined) => {
         if (!result || !this.list) return;
 
+        /*
+          The dialog can create a titled section and any number of sections from
+          groups in one go, so the writes are gathered and reported together —
+          one trip through the dialog, one message.
+         */
+        const writes: Observable<unknown>[] = [];
+
         // An untitled section would be indistinguishable on screen, so a blank
         // field simply means "no new section" rather than an error.
         const newSectionTitle = result.newSectionTitle?.trim();
         if (newSectionTitle) {
-          const obs = this.isShared
-            ? this.listService.addEmptySharedSectionToList(this.list.id, newSectionTitle)
-            : this.listService.addEmptySectionToList(this.list.id, newSectionTitle);
-          obs.subscribe();
+          writes.push(
+            this.isShared
+              ? this.listService.addEmptySharedSectionToList(this.list.id, newSectionTitle)
+              : this.listService.addEmptySectionToList(this.list.id, newSectionTitle)
+          );
         }
 
         result.groups.forEach((group) => {
-          const obs = this.isShared
-            ? this.listService.addSharedSectionToList(this.list!.id, group)
-            : this.listService.addSectionToList(this.list!.id, group);
-          obs.subscribe();
+          writes.push(
+            this.isShared
+              ? this.listService.addSharedSectionToList(this.list!.id, group)
+              : this.listService.addSectionToList(this.list!.id, group)
+          );
         });
+
+        if (writes.length) {
+          const change = writes.length === 1 ? 'the new section' : 'the new sections';
+          this.writeFeedback.report(forkJoin(writes), change);
+        }
       });
     });
   }
@@ -280,7 +305,10 @@ export class ListComponent implements OnInit {
     if (section) {
       this.pendingItemRow = itemRow ?? null;
       const updatedItems = [...section.items, { name: item.trim(), checked: false }];
-      this.updateItems(sectionId, updatedItems);
+      this.writeFeedback.report(
+        this.updateItems(sectionId, updatedItems),
+        'the new item'
+      );
     }
   }
 
@@ -311,7 +339,7 @@ export class ListComponent implements OnInit {
     const obs = this.isShared
       ? this.listService.updateSharedItemAt(this.list.id, section.id, index, item)
       : this.listService.updateItemAt(this.list.id, section.id, index, item);
-    obs.subscribe();
+    this.writeFeedback.report(obs, 'the mark');
   }
 
   renameLabel(section: Section): string {
@@ -342,7 +370,7 @@ export class ListComponent implements OnInit {
       const obs = this.isShared
         ? this.listService.renameSharedSection(this.list.id, section.id, title)
         : this.listService.renameSection(this.list.id, section.id, title);
-      obs.subscribe();
+      this.writeFeedback.report(obs, 'the new name');
     });
   }
 
@@ -355,7 +383,7 @@ export class ListComponent implements OnInit {
       const obs = this.isShared
         ? this.listService.removeSharedSectionFromList(this.list.id, dragData.id)
         : this.listService.removeSectionFromList(this.list.id, dragData.id);
-      obs.subscribe();
+      this.writeFeedback.report(obs, 'the deletion');
       return;
     }
 
@@ -365,12 +393,23 @@ export class ListComponent implements OnInit {
       );
       if (section) {
         section.items.splice(event.previousIndex, 1);
-        this.updateItems(section.id, section.items);
+        this.writeFeedback.report(
+          this.updateItems(section.id, section.items),
+          'the deletion'
+        );
       }
     }
   }
 
   dropItem(event: CdkDragDrop<Item[]>): void {
+    /*
+      A move between sections rewrites both of them, so the writes are collected
+      and reported together: one dragged item is one user action, and it earns
+      one message however many sections it touches.
+     */
+    const writes: Observable<void>[] = [];
+    let change = 'the new order';
+
     if (event.previousContainer === event.container) {
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
     } else {
@@ -380,17 +419,22 @@ export class ListComponent implements OnInit {
         event.previousIndex,
         event.currentIndex
       );
+      change = 'the moved item';
       const prevSectionId = this.resolveSectionId(event.previousContainer.id);
       const prevSection = this.list?.sections.find((s) => s.id === prevSectionId);
       if (prevSection && this.list) {
-        this.updateItems(prevSection.id, prevSection.items);
+        writes.push(this.updateItems(prevSection.id, prevSection.items));
       }
     }
 
     const sectionId = this.resolveSectionId(event.container.id);
     const section = this.list?.sections.find((s) => s.id === sectionId);
     if (section && this.list) {
-      this.updateItems(section.id, section.items);
+      writes.push(this.updateItems(section.id, section.items));
+    }
+
+    if (writes.length) {
+      this.writeFeedback.report(forkJoin(writes), change);
     }
   }
 
@@ -402,12 +446,17 @@ export class ListComponent implements OnInit {
     return ['trash-list', ...otherIds];
   }
 
-  private updateItems(sectionId: string, items: Item[]): void {
-    if (!this.list) return;
-    const obs = this.isShared
+  /*
+    Builds the write for a section's items without firing it: five handlers share
+    this funnel, and only the handler knows what the user just did, so the label
+    — and the subscription — belong to the caller. Nothing is written until it
+    hands the result to `writeFeedback.report`.
+   */
+  private updateItems(sectionId: string, items: Item[]): Observable<void> {
+    if (!this.list) return of(undefined);
+    return this.isShared
       ? this.listService.updateSharedSectionItems(this.list.id, sectionId, items)
       : this.listService.updateSectionItems(this.list.id, sectionId, items);
-    obs.subscribe();
   }
 
   private resolveSectionId(containerId: string): string {
