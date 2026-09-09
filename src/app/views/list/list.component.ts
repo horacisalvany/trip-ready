@@ -32,6 +32,7 @@ import { Section } from './section';
 import { DRAG_START_DELAY } from '../drag-config';
 import { TapGuard } from '../tap-guard';
 import { trackById, trackByIndex } from '../track-by';
+import { keepInView } from '../keep-in-view';
 
 export function formatSharedWith(emails: string[]): string {
   if (emails.length === 0) return '';
@@ -83,6 +84,13 @@ export class ListComponent implements OnInit {
     draggable, so without this a drop would flip whatever it landed on.
    */
   private readonly itemTap = new TapGuard();
+  /*
+    The "New item..." row last typed into. An add writes to Firebase and waits
+    for the stream to re-emit, so the new item — and the shove it gives this row
+    — arrives later than the add itself. Held here until that emission, then
+    scrolled back into view.
+   */
+  private pendingItemRow: HTMLElement | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -109,6 +117,14 @@ export class ListComponent implements OnInit {
           : this.listService.getList(id);
         listObs.subscribe((list) => {
           this.list = list;
+          /*
+            Cleared on the first emission after an add, whether or not it is that
+            add's own: a write that never comes back costs one late, harmless
+            `nearest` scroll instead of leaving a stale element held forever.
+           */
+          const row = this.pendingItemRow;
+          this.pendingItemRow = null;
+          keepInView(row);
         });
       }
     });
@@ -254,10 +270,15 @@ export class ListComponent implements OnInit {
     });
   }
 
-  onAddItemToSection(sectionId: string, item: string): void {
+  /*
+    `itemRow` is optional so a caller with no element to keep on screen — a unit
+    test, or a future non-template caller — still compiles.
+   */
+  onAddItemToSection(sectionId: string, item: string, itemRow?: HTMLElement): void {
     if (!this.list || !item.trim()) return;
     const section = this.list.sections.find((s) => s.id === sectionId);
     if (section) {
+      this.pendingItemRow = itemRow ?? null;
       const updatedItems = [...section.items, { name: item.trim(), checked: false }];
       this.updateItems(sectionId, updatedItems);
     }
