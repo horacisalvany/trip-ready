@@ -8,6 +8,7 @@ import { MaterialModule } from 'src/app/material.module';
 import { AuthService } from '../../services/auth.service';
 import { ListService } from '../list/list.service';
 import { ShareService } from '../../services/share.service';
+import { WriteFeedbackService } from '../../services/write-feedback.service';
 import { DialogAddListComponent } from './dialog-add-list/dialog-add-list.component';
 import { List } from './list';
 import { DRAG_START_DELAY } from '../drag-config';
@@ -35,7 +36,8 @@ export class ListsComponent implements OnInit {
     private snackBar: MatSnackBar,
     private authService: AuthService,
     private listService: ListService,
-    private shareService: ShareService
+    private shareService: ShareService,
+    private writeFeedback: WriteFeedbackService
   ) {}
 
   ngOnInit(): void {
@@ -74,12 +76,18 @@ export class ListsComponent implements OnInit {
         this.snackBar.open('Only the list creator can delete a shared list', 'OK', { duration: 3000 });
         return;
       }
-      this.shareService.deleteSharedList(dragData.id).subscribe();
+      this.writeFeedback.report(
+        this.shareService.deleteSharedList(dragData.id),
+        'the deletion'
+      );
       return;
     }
 
     // Personal list drag data: plain string id
-    this.listService.deleteList(dragData).subscribe();
+    this.writeFeedback.report(
+      this.listService.deleteList(dragData),
+      'the deletion'
+    );
   }
 
   dropList(_event: CdkDragDrop<any>) {
@@ -104,7 +112,10 @@ export class ListsComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe((titleList: string) => {
       if (titleList) {
-        this.listService.addList(titleList).subscribe();
+        this.writeFeedback.report(
+          this.listService.addList(titleList),
+          'the new list'
+        );
       }
     });
   }
