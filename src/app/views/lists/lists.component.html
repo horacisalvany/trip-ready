@@ -20,7 +20,7 @@
     (cdkDropListDropped)="dropList($event)"
   >
     <mat-list-item
-      *ngFor="let list of lists"
+      *ngFor="let list of lists; trackBy: trackByListId"
       cdkDrag
       [cdkDragData]="list.id"
       [cdkDragStartDelay]="dragStartDelay"
@@ -35,7 +35,7 @@
     <h2 class="shared-heading">Shared with me</h2>
     <mat-list role="list" cdkDropList (cdkDropListDropped)="dropList($event)">
       <mat-list-item
-        *ngFor="let list of sharedLists"
+        *ngFor="let list of sharedLists; trackBy: trackByListId"
         cdkDrag
         [cdkDragData]="{ type: 'shared', id: list.id, ownerUid: list.ownerUid }"
         [cdkDragStartDelay]="dragStartDelay"

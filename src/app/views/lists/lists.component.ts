@@ -11,6 +11,7 @@ import { ShareService } from '../../services/share.service';
 import { DialogAddListComponent } from './dialog-add-list/dialog-add-list.component';
 import { List } from './list';
 import { DRAG_START_DELAY } from '../drag-config';
+import { trackById } from '../track-by';
 
 @Component({
   selector: 'lists',
@@ -24,6 +25,8 @@ export class ListsComponent implements OnInit {
   sharedLists: List[] = [];
   currentUserUid: string | null = null;
   readonly dragStartDelay = DRAG_START_DELAY;
+  /* Both groups of rows are rebuilt on every emission without this — see track-by.ts. */
+  readonly trackByListId = trackById;
 
   constructor(
     private router: Router,
