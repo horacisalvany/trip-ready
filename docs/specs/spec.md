@@ -71,6 +71,27 @@ touchable pixel belongs to a draggable element. To keep those screens scrollable
 
 ---
 
+## Saving
+
+Every change is written to Firebase as it is made — there is no save button — so a write that
+fails is a change the user believes they made and did not.
+
+- When a write fails, a message names what was not saved: `Could not save the new item. Please
+  try again.`, and likewise for the mark, the deletion, the new name, the new order, the moved
+  item, the new list, the new group, the new section(s), the cleared marks.
+- One user action, one message: clearing every mark rewrites a node per marked section and
+  dragging an item between sections rewrites both of them, and each still reports once.
+- The message is dismissible and blocks nothing. Nothing on the screen becomes read-only, and
+  the user is free to retry the change or carry on.
+- A successful write says nothing at all. So does a write attempted while signed out — the
+  user is already on their way to the login screen.
+- A failure is never reported only to the console. The screen still shows the change until the
+  list is reopened, so the message is the only thing standing between the user and a silent loss.
+- Sharing a list is the exception: its dialog reports failures inline and stays open to be
+  retried, which is more use than a message behind a closed dialog.
+
+---
+
 ## Shared Lists
 
 Sharing turns a private list into a collaborative document with a single source of truth.

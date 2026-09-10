@@ -2,10 +2,12 @@ import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testin
 import { By } from '@angular/platform-browser';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { GroupComponent } from './group.component';
 import { GroupService } from './group.service';
+import { WriteFeedbackService } from '../../services/write-feedback.service';
 import { Group } from './group';
 import { DialogRenameComponent } from '../dialog-rename/dialog-rename.component';
 import { expectAllDragsHaveStartDelay } from '../drag-config.spec-helper';
@@ -21,6 +23,7 @@ describe('GroupComponent', () => {
   let fixture: ComponentFixture<GroupComponent>;
   let mockGroupService: jasmine.SpyObj<GroupService>;
   let mockDialog: jasmine.SpyObj<MatDialog>;
+  let snackBar: MatSnackBar;
 
   beforeEach(async () => {
     mockGroupService = jasmine.createSpyObj('GroupService', [
@@ -41,7 +44,12 @@ describe('GroupComponent', () => {
     mockDialog = jasmine.createSpyObj('MatDialog', ['open']);
 
     await TestBed.configureTestingModule({
-      imports: [MatDialogModule, MatIconModule, DragDropModule],
+      imports: [
+        MatDialogModule,
+        MatIconModule,
+        DragDropModule,
+        MatSnackBarModule,
+      ],
       declarations: [GroupComponent],
       providers: [
         { provide: GroupService, useValue: mockGroupService },
@@ -51,6 +59,13 @@ describe('GroupComponent', () => {
   });
 
   beforeEach(() => {
+    /*
+      The real WriteFeedbackService with its snackbar spied, so the message the
+      user would actually read is what gets asserted.
+     */
+    snackBar = (TestBed.inject(WriteFeedbackService) as any).snackBar;
+    spyOn(snackBar, 'open');
+
     fixture = TestBed.createComponent(GroupComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -135,13 +150,6 @@ describe('GroupComponent', () => {
       'g1',
       component.groups[0].items
     );
-  });
-
-  // --- updateFirebase ---
-
-  it('should call groupService.updateGroup', () => {
-    component.updateFirebase('g1', ['item1']);
-    expect(mockGroupService.updateGroup).toHaveBeenCalledWith('g1', ['item1']);
   });
 
   // --- drop (same container) ---
@@ -663,5 +671,132 @@ describe('GroupComponent', () => {
 
     expect(after).toBe(input);
     expect(after.value).toBe('half typed');
+  });
+
+  // --- failed writes are reported (F10) ---
+
+  describe('reporting failed writes', () => {
+    const failing = () => throwError(() => new Error('offline'));
+
+    function expectReported(change: string): void {
+      expect(snackBar.open).toHaveBeenCalledWith(
+        `Could not save ${change}. Please try again.`,
+        'OK',
+        jasmine.any(Object)
+      );
+    }
+
+    function closeDialogWith(value: unknown): void {
+      mockDialog.open.and.returnValue({
+        afterClosed: () => of(value),
+      } as MatDialogRef<any>);
+    }
+
+    it('tells the user the new item was not saved', () => {
+      mockGroupService.updateGroup.and.returnValue(failing());
+
+      component.onAdd(0, { value: 'Sunglasses' } as HTMLInputElement);
+
+      expectReported('the new item');
+    });
+
+    it('tells the user a failed item deletion was not saved', () => {
+      mockGroupService.updateGroup.and.returnValue(failing());
+
+      component.onDelete(0, 0);
+
+      expectReported('the deletion');
+    });
+
+    it('tells the user a failed group deletion was not saved', () => {
+      mockGroupService.deleteGroup.and.returnValue(failing());
+
+      component.dropTrash({
+        previousIndex: 0,
+        previousContainer: { id: 'group-cards' },
+        container: { id: 'trash' },
+        item: { data: { type: 'group', id: 'g1' } },
+      } as unknown as CdkDragDrop<string[]>);
+
+      expectReported('the deletion');
+    });
+
+    it('tells the user the new group was not saved', () => {
+      mockGroupService.addGroup.and.returnValue(failing());
+      closeDialogWith('New Group');
+
+      component.openDialogAddGroup();
+
+      expectReported('the new group');
+    });
+
+    it('tells the user the new name was not saved', () => {
+      mockGroupService.renameGroup.and.returnValue(failing());
+      closeDialogWith('Renamed');
+
+      component.openRenameDialog(component.groups[0]);
+
+      expectReported('the new name');
+    });
+
+    it('tells the user a failed reorder was not saved', () => {
+      mockGroupService.updateGroup.and.returnValue(failing());
+      const container = { id: 'cdk-drop-list-g1', data: component.groups[0].items };
+
+      component.drop({
+        previousIndex: 0,
+        currentIndex: 1,
+        previousContainer: container,
+        container,
+        item: { data: { type: 'item' } },
+      } as unknown as CdkDragDrop<string[]>);
+
+      expectReported('the new order');
+    });
+
+    /*
+      A move across cards rewrites two groups. Two failures, one action, so the
+      user must be told once — not handed the same news twice.
+     */
+    it('reports a failed move across cards exactly once', () => {
+      mockGroupService.updateGroup.and.returnValue(failing());
+
+      component.drop({
+        previousIndex: 0,
+        currentIndex: 0,
+        previousContainer: {
+          id: 'cdk-drop-list-g1',
+          data: component.groups[0].items,
+        },
+        container: { id: 'cdk-drop-list-g2', data: component.groups[1].items },
+        item: { data: { type: 'item' } },
+      } as unknown as CdkDragDrop<string[]>);
+
+      expect(mockGroupService.updateGroup).toHaveBeenCalledTimes(2);
+      expect(snackBar.open).toHaveBeenCalledTimes(1);
+      expectReported('the moved item');
+    });
+
+    it('says nothing when the writes succeed', () => {
+      component.onAdd(0, { value: 'Sunglasses' } as HTMLInputElement);
+      component.onDelete(0, 0);
+
+      expect(snackBar.open).not.toHaveBeenCalled();
+    });
+
+    /*
+      A console message is not a report: it tells the developer and leaves the
+      user believing the change was saved. This is what F10 replaced.
+     */
+    it('does not report a failure to the console instead of the user', () => {
+      const log = spyOn(console, 'log');
+      const error = spyOn(console, 'error');
+      mockGroupService.updateGroup.and.returnValue(failing());
+
+      component.onAdd(0, { value: 'Sunglasses' } as HTMLInputElement);
+
+      expect(log).not.toHaveBeenCalled();
+      expect(error).not.toHaveBeenCalled();
+    });
   });
 });

@@ -6,6 +6,8 @@ import {
 } from '@angular/cdk/drag-drop';
 import { Component, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { Observable, forkJoin } from 'rxjs';
+import { WriteFeedbackService } from '../../services/write-feedback.service';
 import { Group } from './group';
 import { GroupService } from './group.service';
 import { DialogCreateGroupComponent } from './dialog-add-group/dialog-add-group.component';
@@ -47,7 +49,11 @@ export class GroupComponent implements OnInit {
    */
   private readonly titleTap = new TapGuard();
 
-  constructor(private groupService: GroupService, public dialog: MatDialog) {}
+  constructor(
+    private groupService: GroupService,
+    public dialog: MatDialog,
+    private writeFeedback: WriteFeedbackService
+  ) {}
 
   ngOnInit(): void {
     this.loadgroups();
@@ -66,6 +72,14 @@ export class GroupComponent implements OnInit {
       (a) => 'cdk-drop-list-' + a.id === containerId
     );
 
+    /*
+      A move across cards rewrites both of them, so the writes are collected and
+      reported together: one dropped item is one user action, and it earns one
+      message however many nodes it touches.
+     */
+    const writes: Observable<void>[] = [];
+    let change = 'the new order';
+
     if (event.previousContainer === event.container) {
       moveItemInArray(event.container.data, previousIndex, currentIndex);
     } else {
@@ -75,6 +89,7 @@ export class GroupComponent implements OnInit {
         previousIndex,
         currentIndex
       );
+      change = 'the moved item';
 
       // Also update the source group
       const prevContainerId = event.previousContainer.id;
@@ -82,31 +97,27 @@ export class GroupComponent implements OnInit {
         (a) => 'cdk-drop-list-' + a.id === prevContainerId
       );
       if (prevgroup) {
-        this.updateFirebase(prevgroup.id, prevgroup.items);
+        writes.push(this.groupService.updateGroup(prevgroup.id, prevgroup.items));
       }
     }
 
     if (group) {
-      this.updateFirebase(group.id, group.items);
+      writes.push(this.groupService.updateGroup(group.id, group.items));
     }
-  }
 
-  updateFirebase(id: string, items: string[]) {
-    this.groupService.updateGroup(id, items).subscribe(
-      () => {
-        console.log('Firebase updated successfully');
-      },
-      (error) => {
-        console.error('Error updating Firebase:', error);
-      }
-    );
+    if (writes.length) {
+      this.writeFeedback.report(forkJoin(writes), change);
+    }
   }
 
   dropTrash(event: CdkDragDrop<string[]>) {
     this.markRecentlyDropped();
     const dragData = event.item.data;
     if (dragData?.type === 'group') {
-      this.groupService.deleteGroup(dragData.id).subscribe();
+      this.writeFeedback.report(
+        this.groupService.deleteGroup(dragData.id),
+        'the deletion'
+      );
       return;
     }
     const prevContainerId = event.previousContainer.id;
@@ -115,7 +126,10 @@ export class GroupComponent implements OnInit {
     );
     if (group) {
       group.items.splice(event.previousIndex, 1);
-      this.updateFirebase(group.id, group.items);
+      this.writeFeedback.report(
+        this.groupService.updateGroup(group.id, group.items),
+        'the deletion'
+      );
     }
   }
 
@@ -135,7 +149,10 @@ export class GroupComponent implements OnInit {
   onDelete(groupIndex: number, elementIndex: number) {
     const group = this.groups[groupIndex];
     group.items.splice(elementIndex, 1);
-    this.updateFirebase(group.id, group.items);
+    this.writeFeedback.report(
+      this.groupService.updateGroup(group.id, group.items),
+      'the deletion'
+    );
   }
 
   /*
@@ -147,7 +164,10 @@ export class GroupComponent implements OnInit {
     if (!value) return;
     const group = this.groups[index];
     group.items.push(value);
-    this.updateFirebase(group.id, group.items);
+    this.writeFeedback.report(
+      this.groupService.updateGroup(group.id, group.items),
+      'the new item'
+    );
     // The new item pushes this row down; bring it back if it fell off screen.
     keepInView(itemRow);
   }
@@ -193,7 +213,10 @@ export class GroupComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe((title: string | undefined) => {
       if (!title) return;
-      this.groupService.renameGroup(group.id, title).subscribe();
+      this.writeFeedback.report(
+        this.groupService.renameGroup(group.id, title),
+        'the new name'
+      );
     });
   }
 
@@ -206,7 +229,10 @@ export class GroupComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe((title: string) => {
       if (title) {
-        this.groupService.addGroup(title).subscribe();
+        this.writeFeedback.report(
+          this.groupService.addGroup(title),
+          'the new group'
+        );
       }
     });
   }

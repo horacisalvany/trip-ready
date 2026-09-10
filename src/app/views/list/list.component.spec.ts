@@ -4,9 +4,11 @@ import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dial
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule, MatTooltip } from '@angular/material/tooltip';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { CdkDrag, CdkDropList, DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { ActivatedRoute } from '@angular/router';
-import { Observable, of, Subject } from 'rxjs';
+import { Observable, of, Subject, throwError } from 'rxjs';
+import { WriteFeedbackService } from '../../services/write-feedback.service';
 import { ListComponent, formatSharedWith } from './list.component';
 import { TAP_MOVE_TOLERANCE_PX } from '../tap-guard';
 import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
@@ -103,6 +105,7 @@ describe('ListComponent', () => {
   let mockListService: jasmine.SpyObj<ListService>;
   let mockGroupService: jasmine.SpyObj<GroupService>;
   let mockAuthService: { user$: Subject<{ uid: string } | null> };
+  let snackBar: MatSnackBar;
 
   beforeEach(async () => {
     mockListService = jasmine.createSpyObj('ListService', [
@@ -146,7 +149,7 @@ describe('ListComponent', () => {
     mockAuthService = { user$: new Subject() };
 
     await TestBed.configureTestingModule({
-      imports: [ListComponent, MatDialogModule, MatListModule, MatIconModule, MatTooltipModule, DragDropModule],
+      imports: [ListComponent, MatDialogModule, MatListModule, MatIconModule, MatTooltipModule, MatSnackBarModule, DragDropModule],
       providers: [
         { provide: ListService, useValue: mockListService },
         { provide: GroupService, useValue: mockGroupService },
@@ -160,6 +163,13 @@ describe('ListComponent', () => {
         },
       ],
     }).compileComponents();
+
+    /*
+      The real WriteFeedbackService with its snackbar spied, so the message the
+      user would actually read is what gets asserted.
+     */
+    snackBar = (TestBed.inject(WriteFeedbackService) as any).snackBar;
+    spyOn(snackBar, 'open');
 
     fixture = TestBed.createComponent(ListComponent);
     component = fixture.componentInstance;
@@ -760,7 +770,7 @@ describe('ListComponent', () => {
 
     await TestBed.resetTestingModule();
     await TestBed.configureTestingModule({
-      imports: [ListComponent, MatDialogModule, MatListModule, MatIconModule, MatTooltipModule, DragDropModule],
+      imports: [ListComponent, MatDialogModule, MatListModule, MatIconModule, MatTooltipModule, MatSnackBarModule, DragDropModule],
       providers: [
         { provide: ListService, useValue: mockListService },
         { provide: GroupService, useValue: mockGroupService },
@@ -1840,5 +1850,181 @@ describe('ListComponent', () => {
 
       expect(scrollIntoView).not.toHaveBeenCalled();
     }));
+  });
+
+  // --- failed writes are reported (F10) ---
+
+  describe('reporting failed writes', () => {
+    const failing = () => throwError(() => new Error('offline'));
+
+    function expectReported(change: string): void {
+      expect(snackBar.open).toHaveBeenCalledWith(
+        `Could not save ${change}. Please try again.`,
+        'OK',
+        jasmine.any(Object)
+      );
+    }
+
+    function closeDialogWith(value: unknown): jasmine.Spy {
+      const dialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
+      dialogRef.afterClosed.and.returnValue(of(value));
+      return spyOn(component.dialog, 'open').and.returnValue(dialogRef);
+    }
+
+    it('tells the user the new item was not saved', () => {
+      mockListService.updateSectionItems.and.returnValue(failing());
+
+      component.onAddItemToSection('s1', 'Sunglasses');
+
+      expectReported('the new item');
+    });
+
+    it('tells the user the mark was not saved', () => {
+      mockListService.updateItemAt.and.returnValue(failing());
+      component.checklistMode = true;
+      const section = component.list!.sections[1];
+      /* A press the tap guard can vouch for, then the click it belongs to. */
+      const press = new MouseEvent('mousedown', { clientX: 10, clientY: 10 });
+      component.onItemPressStart(press);
+
+      component.toggleItemMark(section, 0, press);
+
+      expectReported('the mark');
+    });
+
+    it('tells the user the new name was not saved', () => {
+      mockListService.renameSection.and.returnValue(failing());
+      closeDialogWith('Hand luggage');
+
+      component.openRenameDialog(component.list!.sections[1]);
+
+      expectReported('the new name');
+    });
+
+    it('tells the user a failed section deletion was not saved', () => {
+      mockListService.removeSectionFromList.and.returnValue(failing());
+
+      component.dropTrash({
+        previousIndex: 0,
+        item: { data: { type: 'section', id: 's1' } },
+      } as unknown as CdkDragDrop<any>);
+
+      expectReported('the deletion');
+    });
+
+    it('tells the user a failed item deletion was not saved', () => {
+      mockListService.updateSectionItems.and.returnValue(failing());
+
+      component.dropTrash({
+        previousIndex: 0,
+        item: { data: { type: 'item', sectionId: 's1' } },
+      } as unknown as CdkDragDrop<any>);
+
+      expectReported('the deletion');
+    });
+
+    it('tells the user a failed reorder was not saved', () => {
+      mockListService.updateSectionItems.and.returnValue(failing());
+      const container = {
+        id: 'cdk-drop-list-section-s1',
+        data: component.list!.sections[1].items,
+      };
+
+      component.dropItem({
+        previousIndex: 0,
+        currentIndex: 1,
+        previousContainer: container,
+        container,
+      } as unknown as CdkDragDrop<Item[]>);
+
+      expectReported('the new order');
+    });
+
+    /*
+      Both ends of the drag are rewritten, so both fail. One dragged item is one
+      action, and the user must be told once — not handed the same news twice.
+     */
+    it('reports a failed move between sections exactly once', () => {
+      mockListService.updateSectionItems.and.returnValue(failing());
+
+      component.dropItem({
+        previousIndex: 0,
+        currentIndex: 1,
+        previousContainer: {
+          id: 'cdk-drop-list-section-s1',
+          data: component.list!.sections[1].items,
+        },
+        container: {
+          id: 'cdk-drop-list-section-s2',
+          data: component.list!.sections[2].items,
+        },
+      } as unknown as CdkDragDrop<Item[]>);
+
+      expect(mockListService.updateSectionItems).toHaveBeenCalledTimes(2);
+      expect(snackBar.open).toHaveBeenCalledTimes(1);
+      expectReported('the moved item');
+    });
+
+    /*
+      Unmark-all writes one node per marked section. Two marked sections here,
+      and still one message.
+     */
+    it('reports a failed unmark-all exactly once', () => {
+      component.list!.sections[1].items[0].checked = true;
+      component.list!.sections[2].items[1].checked = true;
+      mockListService.updateSectionItems.and.returnValue(failing());
+      closeDialogWith(true);
+
+      component.unmarkAll();
+
+      expect(mockListService.updateSectionItems).toHaveBeenCalledTimes(2);
+      expect(snackBar.open).toHaveBeenCalledTimes(1);
+      expectReported('the cleared marks');
+    });
+
+    it('tells the user the new section was not saved', () => {
+      mockListService.addEmptySectionToList.and.returnValue(failing());
+      closeDialogWith(dialogResult([], 'Beach gear'));
+
+      component.openDialogAddGroup();
+
+      expectReported('the new section');
+    });
+
+    /*
+      One trip through the add dialog can create several sections; a failure is
+      still one message, and it says "sections" because that is what was lost.
+     */
+    it('reports several failed new sections once, in the plural', () => {
+      mockListService.addSectionToList.and.returnValue(failing());
+      mockListService.addEmptySectionToList.and.returnValue(failing());
+      closeDialogWith(dialogResult([MOCK_GROUPS[1], MOCK_GROUPS[2]], 'Beach gear'));
+
+      component.openDialogAddGroup();
+
+      expect(snackBar.open).toHaveBeenCalledTimes(1);
+      expectReported('the new sections');
+    });
+
+    it('says nothing when the writes succeed', () => {
+      component.onAddItemToSection('s1', 'Sunglasses');
+      closeDialogWith('Hand luggage');
+      component.openRenameDialog(component.list!.sections[1]);
+
+      expect(snackBar.open).not.toHaveBeenCalled();
+    });
+
+    /*
+      Signed out, a write completes having done nothing — ListService yields no
+      user path — and the auth guard is already routing to the login screen. A
+      snackbar there would be noise about a change the user never made.
+     */
+    it('stays silent when a write completes with no signed-in user', () => {
+      mockListService.updateSectionItems.and.returnValue(of(undefined));
+
+      component.onAddItemToSection('s1', 'Sunglasses');
+
+      expect(snackBar.open).not.toHaveBeenCalled();
+    });
   });
 });

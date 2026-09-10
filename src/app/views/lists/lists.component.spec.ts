@@ -6,12 +6,13 @@ import { MatIconModule } from '@angular/material/icon';
 import { DragDropModule, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { ActivatedRoute, Router } from '@angular/router';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { of } from 'rxjs';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { of, throwError } from 'rxjs';
 import { ListsComponent } from './lists.component';
 import { AuthService } from '../../services/auth.service';
 import { ListService } from '../list/list.service';
 import { ShareService } from '../../services/share.service';
+import { WriteFeedbackService } from '../../services/write-feedback.service';
 import { List } from './list';
 import { expectAllDragsHaveStartDelay } from '../drag-config.spec-helper';
 
@@ -39,6 +40,7 @@ describe('ListsComponent', () => {
   let mockAuthService: any;
   let snackBar: MatSnackBar;
   let mockRouter: jasmine.SpyObj<Router>;
+  let writeFeedback: WriteFeedbackService;
 
   beforeEach(async () => {
     mockListService = jasmine.createSpyObj('ListService', [
@@ -69,6 +71,7 @@ describe('ListsComponent', () => {
         MatListModule,
         MatIconModule,
         DragDropModule,
+        MatSnackBarModule,
         NoopAnimationsModule,
       ],
       providers: [
@@ -84,6 +87,14 @@ describe('ListsComponent', () => {
         },
       ],
     }).compileComponents();
+
+    /*
+      Real service, spied so the label each handler picks can be asserted while
+      the call still goes through to a real snackbar. The message wording itself
+      is covered in write-feedback.service.spec.ts.
+     */
+    writeFeedback = TestBed.inject(WriteFeedbackService);
+    spyOn(writeFeedback, 'report').and.callThrough();
 
     fixture = TestBed.createComponent(ListsComponent);
     component = fixture.componentInstance;
@@ -303,5 +314,69 @@ describe('ListsComponent', () => {
      */
     expect(after.length).toBe(before.length);
     after.forEach((row, i) => expect(row).toBe(before[i]));
+  });
+
+  // --- failed writes are reported (F10) ---
+
+  describe('reporting failed writes', () => {
+    const failing = () => throwError(() => new Error('offline'));
+
+    function addList(): void {
+      const dialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
+      dialogRef.afterClosed.and.returnValue(of('Beach Holiday'));
+      spyOn(component.dialog, 'open').and.returnValue(dialogRef);
+      component.openDialogAddList();
+    }
+
+    function dropOnTrash(data: unknown): void {
+      component.dropTrash({
+        container: { id: 'trash' },
+        item: { data },
+      } as unknown as CdkDragDrop<any>);
+    }
+
+    it('tells the user the new list was not saved', () => {
+      mockListService.addList.and.returnValue(failing());
+      const open = spyOn((writeFeedback as any).snackBar, 'open');
+
+      addList();
+
+      expect(open).toHaveBeenCalledWith(
+        'Could not save the new list. Please try again.',
+        'OK',
+        jasmine.any(Object)
+      );
+    });
+
+    it('tells the user a failed list deletion was not saved', () => {
+      mockListService.deleteList.and.returnValue(failing());
+
+      dropOnTrash('l1');
+
+      expect(writeFeedback.report).toHaveBeenCalledWith(
+        jasmine.anything(),
+        'the deletion'
+      );
+    });
+
+    it('tells the user a failed shared-list deletion was not saved', () => {
+      mockShareService.deleteSharedList.and.returnValue(failing());
+
+      dropOnTrash({ type: 'shared', id: 'sl1', ownerUid: 'currentUid' });
+
+      expect(writeFeedback.report).toHaveBeenCalledWith(
+        jasmine.anything(),
+        'the deletion'
+      );
+    });
+
+    it('says nothing when the write succeeds', () => {
+      const open = spyOn((writeFeedback as any).snackBar, 'open');
+
+      addList();
+      dropOnTrash('l1');
+
+      expect(open).not.toHaveBeenCalled();
+    });
   });
 });
