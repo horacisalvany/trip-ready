@@ -126,21 +126,21 @@
             (click)="toggleItemMark(section, itemIndex, $event)"
           >{{ item.name }}</mat-list-item>
         </mat-list>
-        <div class="add-item-row">
+        <div class="add-item-row" #addItemRow>
           <input
             #itemInput
             type="text"
             maxlength="40"
             placeholder="New item..."
             (keyup.enter)="
-              onAddItemToSection(section.id, itemInput.value);
+              onAddItemToSection(section.id, itemInput.value, addItemRow);
               itemInput.value = ''
             "
           />
           <button
             mat-icon-button
             (click)="
-              onAddItemToSection(section.id, itemInput.value);
+              onAddItemToSection(section.id, itemInput.value, addItemRow);
               itemInput.value = ''
             "
           >

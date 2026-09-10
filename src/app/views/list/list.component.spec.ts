@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatListModule } from '@angular/material/list';
@@ -1738,5 +1738,107 @@ describe('ListComponent', () => {
       expect(after.length).toBe(before.length);
       after.forEach((row, i) => expect(row).toBe(before[i]));
     });
+  });
+
+  // --- keeping the "New item..." row in view (F11) ---
+
+  describe('keeping the "New item..." row in view', () => {
+    /*
+      A fresh copy each call, with fresh section and item objects — exactly what
+      ListService.parseSections hands out on every emission.
+     */
+    function cloneMockList(): List {
+      return { ...MOCK_LIST, sections: copySections(MOCK_LIST.sections) };
+    }
+
+    /*
+      A list driven by a Subject instead of the `of()` in beforeEach: the list
+      view does not touch its local array on add, it writes and waits for the
+      stream to re-emit, so that emission has to be driven by hand.
+     */
+    function streamedList(): {
+      fixture: ComponentFixture<ListComponent>;
+      emit: (list: List) => void;
+    } {
+      const stream = new Subject<List>();
+      mockListService.getList.and.returnValue(stream);
+      const streamed = TestBed.createComponent(ListComponent);
+      streamed.detectChanges();
+      const emit = (list: List) => {
+        stream.next(list);
+        streamed.detectChanges();
+      };
+      emit(cloneMockList());
+      return { fixture: streamed, emit };
+    }
+
+    /* Section index 1 is 'Packing' (s1); index 0 is the Ungrouped section. */
+    function packingRow(streamed: ComponentFixture<ListComponent>): HTMLElement {
+      return streamed.debugElement.queryAll(By.css('.add-item-row'))[1]
+        .nativeElement as HTMLElement;
+    }
+
+    it('scrolls the row back into view once the added item renders', fakeAsync(() => {
+      const { fixture: streamed, emit } = streamedList();
+      const row = packingRow(streamed);
+      const input = row.querySelector('input') as HTMLInputElement;
+      const scrollIntoView = spyOn(row, 'scrollIntoView');
+
+      input.value = 'Sunglasses';
+      input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter' }));
+      streamed.detectChanges();
+      tick();
+
+      // Nothing has moved yet: the item is not in the DOM until the list re-emits.
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      const updated = cloneMockList();
+      updated.sections[1].items.push({ name: 'Sunglasses', checked: false });
+      emit(updated);
+      tick();
+
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+    }));
+
+    /*
+      F09's guarantee, asserted here because this feature depends on it: if the
+      section card were rebuilt on the emission, the captured row would be
+      detached and the scroll would silently do nothing.
+     */
+    it('leaves focus in the field after adding with Enter', fakeAsync(() => {
+      const { fixture: streamed, emit } = streamedList();
+      const row = packingRow(streamed);
+      const input = row.querySelector('input') as HTMLInputElement;
+      spyOn(row, 'scrollIntoView');
+
+      input.focus();
+      expect(document.activeElement).toBe(input);
+
+      input.value = 'Sunglasses';
+      input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter' }));
+      streamed.detectChanges();
+
+      const updated = cloneMockList();
+      updated.sections[1].items.push({ name: 'Sunglasses', checked: false });
+      emit(updated);
+      tick();
+
+      expect(document.activeElement).toBe(input);
+    }));
+
+    it('does not scroll when nothing is added', fakeAsync(() => {
+      const { fixture: streamed, emit } = streamedList();
+      const row = packingRow(streamed);
+      const input = row.querySelector('input') as HTMLInputElement;
+      const scrollIntoView = spyOn(row, 'scrollIntoView');
+
+      input.value = '   ';
+      input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter' }));
+      streamed.detectChanges();
+      emit(cloneMockList());
+      tick();
+
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    }));
   });
 });

@@ -64,6 +64,10 @@ touchable pixel belongs to a draggable element. To keep those screens scrollable
 - Editing one thing redraws that one thing. Text already typed into a "New item..." field
   is not lost when something else on the screen changes — another section being edited, an
   item being marked, or a co-editor's write arriving on a shared list.
+- Adding an item never leaves the "New item..." field it was typed into off screen: if the
+  field would fall below the fold, the page scrolls just enough to bring it back. A field
+  that is already fully visible does not move the page. This holds for list sections and
+  group cards alike, so several items can be added in a row without scrolling.
 
 ---
 
@@ -137,3 +141,11 @@ Sharing turns a private list into a collaborative document with a single source 
 - The shortcut opens the app standalone (no browser chrome), titled `TripReady`.
 - Icons live in `src/assets/img/` and are declared in `src/manifest.webmanifest`
   (Android/Chrome) and via `apple-touch-icon` in `src/index.html` (iOS).
+
+---
+
+## Footer
+
+- Every view ends with a small footer reading `© <current year> TripReady`, centred and muted.
+- It scrolls with the page rather than being pinned to the bottom of the viewport, so it costs
+  no screen height on a phone.
