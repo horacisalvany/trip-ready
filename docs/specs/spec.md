@@ -61,6 +61,9 @@ touchable pixel belongs to a draggable element. To keep those screens scrollable
 - This applies to every draggable: items, group cards, list sections, and list cards.
 - Text inside a draggable is not selectable, so a long press starts a drag instead of
   selecting text. Text fields are exempt — they keep normal editing, including paste.
+- Editing one thing redraws that one thing. Text already typed into a "New item..." field
+  is not lost when something else on the screen changes — another section being edited, an
+  item being marked, or a co-editor's write arriving on a shared list.
 
 ---
 

@@ -31,7 +31,7 @@
       (cdkDropListDropped)="dropGroupCard($event)"
     >
       <div
-        *ngFor="let group of groups; let i = index"
+        *ngFor="let group of groups; let i = index; trackBy: trackByGroupId"
         class="col-md-4"
         cdkDrag
         [cdkDragData]="{ type: 'group', id: group.id }"

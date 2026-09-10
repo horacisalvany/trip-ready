@@ -31,6 +31,7 @@ import { ListService } from './list.service';
 import { Section } from './section';
 import { DRAG_START_DELAY } from '../drag-config';
 import { TapGuard } from '../tap-guard';
+import { trackById, trackByIndex } from '../track-by';
 
 export function formatSharedWith(emails: string[]): string {
   if (emails.length === 0) return '';
@@ -61,6 +62,12 @@ export class ListComponent implements OnInit {
    */
   checklistMode = false;
   readonly dragStartDelay = DRAG_START_DELAY;
+  /*
+    Without these, every section card — and the "New item..." input inside it —
+    is rebuilt on each emission, throwing away half-typed text. See track-by.ts.
+   */
+  readonly trackBySectionId = trackById;
+  readonly trackByItemIndex = trackByIndex;
   currentUserUid: string | null = null;
   /*
     Boolean to control that something has been dropped. Without there are bugs like missclicks after you drop a list on the trash

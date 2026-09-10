@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
@@ -273,5 +274,34 @@ describe('ListsComponent', () => {
 
     // 2 private lists from MOCK_LISTS + 1 shared list
     expectAllDragsHaveStartDelay(fixture, 3);
+  });
+
+  // --- rows survive an update (F09) ---
+
+  it('keeps the list rows when the lists re-emit', () => {
+    component.sharedLists = MOCK_SHARED_LISTS.map((l) => ({ ...l }));
+    fixture.detectChanges();
+
+    const before = fixture.debugElement
+      .queryAll(By.css('mat-list-item'))
+      .map((row) => row.nativeElement);
+
+    expect(before.length).toBe(MOCK_LISTS.length + MOCK_SHARED_LISTS.length);
+
+    component.lists = MOCK_LISTS.map((l) => ({ ...l }));
+    component.sharedLists = MOCK_SHARED_LISTS.map((l) => ({ ...l }));
+    fixture.detectChanges();
+
+    const after = fixture.debugElement
+      .queryAll(By.css('mat-list-item'))
+      .map((row) => row.nativeElement);
+
+    /*
+      Element by element, and never toEqual: Jasmine deep-compares DOM nodes
+      structurally, so two freshly built rows holding the same title match and
+      the assertion passes without trackBy doing anything.
+     */
+    expect(after.length).toBe(before.length);
+    after.forEach((row, i) => expect(row).toBe(before[i]));
   });
 });
