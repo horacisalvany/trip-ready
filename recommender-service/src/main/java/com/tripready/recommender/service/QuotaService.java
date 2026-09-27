@@ -31,12 +31,13 @@ public class QuotaService {
     public boolean tryConsume(String uid) {
         Instant now = clock.instant();
         Window window = usage.compute(uid, (key, existing) -> {
-            if (existing == null || now.isAfter(existing.resetAt)) {
-                return new Window(new AtomicInteger(0), now.plus(Duration.ofDays(1)));
-            }
-            return existing;
+            Window current = (existing == null || now.isAfter(existing.resetAt))
+                    ? new Window(new AtomicInteger(0), now.plus(Duration.ofDays(1)))
+                    : existing;
+            current.count.incrementAndGet();
+            return current;
         });
-        return window.count.incrementAndGet() <= dailyLimit;
+        return window.count.get() <= dailyLimit;
     }
 
     private static final class Window {
