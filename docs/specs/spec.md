@@ -33,6 +33,7 @@ Groups are reusable templates of items that can be added to lists as sections.
 Lists are travel checklists. Each list has one or more sections.
 
 - A user can create a list with a title.
+- A list can hold an optional **trip note** — free text up to 200 characters, such as "2 weeks Japan in November, with a toddler". It has no effect on its own; it exists to give the item recommender context about the trip. See **Item Recommender**.
 - Every new list starts with a default section called **Ungrouped** where items can be added directly (without a group). Like any other section, it can be deleted; once deleted it is not recreated automatically.
 - A user can create a new, empty section by typing a title. The title must be at least one character (leading and trailing whitespace is ignored); a blank title simply creates nothing. Duplicate titles are allowed.
 - A user can add a group to a list, which creates a new section with the group's items.
@@ -140,6 +141,44 @@ Sharing turns a private list into a collaborative document with a single source 
 |---|---|
 | Owner | Shared section (not private lists) |
 | Recipient | Shared section |
+
+---
+
+## Item Recommender
+
+A list can ask for items it might be missing. Suggestions come from an AI model reading the
+list's sections, items and optional trip note, and are never added to the list without being
+picked.
+
+- A `auto_awesome` button on the list header, immediately before the `+` button, opens the
+  suggestions dialog.
+- The trip note has its own small affordance on the list header — a `notes` icon and, once set, a
+  short preview of the note. Tapping it opens a dialog with the current note pre-filled, the same
+  tap-to-edit pattern used for renaming a section or a group. Unlike a title, a blank note is
+  allowed and clears it; up to 200 characters.
+- The suggestions dialog shows the current note (read-only, with a pencil into the same edit
+  dialog) and a "Suggest items" action that sends the request.
+- While the request is in flight the dialog shows a spinner. The spinner always resolves, on
+  success or failure — it never spins indefinitely.
+- Each returned suggestion shows its name, the section it would go into (an existing section by
+  name, or a new one if no section matches) and a one-line reason, with a checkbox to include it.
+  Every suggestion starts checked.
+- A suggestion never repeats an item already on the list, case-insensitively. At most 10
+  suggestions are shown at once.
+- No suggestions at all is a valid result — it means the list looks complete — and is shown as
+  "Nothing obvious missing.", not as an error.
+- Confirming adds every checked suggestion to the list: to the matching existing section by name
+  (trimmed, case-insensitive), or to a newly created section named after the suggestion's section
+  otherwise. Added items are unmarked, like any new item. The dialog then closes.
+- A request is limited to 10 per user per day. Beyond that, the dialog shows "You've used today's
+  suggestions. Try again tomorrow." and stays open.
+- A request that fails for any other reason shows "Could not get suggestions. Please try again."
+  and stays open, so it can be retried — the same treatment as the share dialog, and unlike every
+  other write in the app (see **Saving**), because a message behind a closed dialog is no use.
+- Writing the trip note, and writing the accepted items to the list, both follow the normal rules
+  in **Saving**: a failed write reports "Could not save the new note." or the item's own message,
+  and nothing on screen becomes read-only.
+- Available on private and shared lists alike, to anyone who can edit the list.
 
 ---
 
