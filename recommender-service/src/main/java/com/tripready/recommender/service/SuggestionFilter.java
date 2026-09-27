@@ -24,7 +24,7 @@ public final class SuggestionFilter {
         Set<String> seen = new HashSet<>();
 
         for (Suggestion suggestion : suggestions) {
-            String key = suggestion.name().trim().toLowerCase(Locale.ROOT);
+            String key = normalize(suggestion.name());
             if (existingItemNamesLowercase.contains(key) || !seen.add(key)) {
                 continue;
             }
@@ -35,5 +35,15 @@ public final class SuggestionFilter {
         }
 
         return result;
+    }
+
+    /**
+     * The one normalization rule item names are compared under, everywhere in this service:
+     * trimmed, lower-cased. Package-private so {@link RecommendationService} builds its
+     * {@code existingItemNamesLowercase} set the same way this class compares against it —
+     * two independent implementations of the same rule is how they quietly drift apart.
+     */
+    static String normalize(String name) {
+        return name.trim().toLowerCase(Locale.ROOT);
     }
 }
