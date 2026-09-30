@@ -55,3 +55,6 @@ docs/superpowers/
 .claude/.last-security-check
 # Superpowers brainstorming scratch (visual companion)
 .superpowers/
+
+# Local git worktrees (superpowers)
+.worktrees/

@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: recommender-service
+  ai:
+    model:
+      chat: google-genai
+    google:
+      genai:
+        chat:
+          model: gemini-3.8-flash
+
+app:
+  firebase:
+    project-id: ready4trip-5d3f6
+  quota:
+    daily-limit: 10

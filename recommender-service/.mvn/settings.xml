@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
+  <!--
+    This is a personal project, not work for Allianz. The machine's own ~/.m2/settings.xml
+    mirrors every request through a corporate Nexus proxy (mirrorOf "*"), which does not yet
+    carry Spring Boot 4.1.1 / Spring AI 2.0.1 and has a broken certificate chain besides. `mvn`
+    invoked from this directory picks up this file instead (see .mvn/maven.config), so it
+    resolves straight from Maven Central regardless of whose machine it runs on.
+  -->
+</settings>
