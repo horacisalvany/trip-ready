@@ -1,0 +1,3 @@
+app:
+  cors:
+    allowed-origin: http://localhost:4200
