@@ -42,6 +42,13 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    # Serializes deploys: without this, two merges to main close together could run two
+    # concurrent gcloud run deploy calls with no ordering guarantee, and whichever finishes
+    # last "wins" regardless of which commit is actually newer.
+    concurrency:
+      group: recommender-deploy
+      cancel-in-progress: false
+
     permissions:
       contents: read
 
