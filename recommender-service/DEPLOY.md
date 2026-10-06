@@ -17,6 +17,9 @@ after the one-time setup below.
 
 ## Manual smoke test after the first deploy
 
+The token request below uses this project's Web API key (public, already in
+`src/environments/environment.ts`), not a leaked secret:
+
 ```bash
 SERVICE_URL=$(gcloud run services describe recommender-service --region europe-west1 --project ready4trip-5d3f6 --format='value(status.url)')
 
