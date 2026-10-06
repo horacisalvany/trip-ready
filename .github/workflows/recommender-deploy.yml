@@ -9,10 +9,10 @@ name: Recommender Service CI/CD
 on:
   push:
     branches: [ "main" ]
-    paths: [ "recommender-service/**" ]
+    paths: [ "recommender-service/**", ".github/workflows/recommender-deploy.yml" ]
   pull_request:
     branches: [ "main" ]
-    paths: [ "recommender-service/**" ]
+    paths: [ "recommender-service/**", ".github/workflows/recommender-deploy.yml" ]
 
 env:
   GCP_PROJECT_ID: ready4trip-5d3f6
@@ -82,4 +82,5 @@ jobs:
             --region ${{ env.GCP_REGION }} \
             --project ${{ env.GCP_PROJECT_ID }} \
             --allow-unauthenticated \
+            --set-env-vars SPRING_PROFILES_ACTIVE=prod \
             --set-secrets GEMINI_API_KEY=gemini-api-key:latest
