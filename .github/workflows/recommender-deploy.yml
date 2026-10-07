@@ -82,5 +82,6 @@ jobs:
             --region ${{ env.GCP_REGION }} \
             --project ${{ env.GCP_PROJECT_ID }} \
             --allow-unauthenticated \
+            --service-account recommender-runtime@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
             --set-env-vars SPRING_PROFILES_ACTIVE=prod \
             --set-secrets GEMINI_API_KEY=gemini-api-key:latest

@@ -4,16 +4,18 @@ Automatic: merging to `main` with changes under `recommender-service/` builds, t
 deploys to Cloud Run via `.github/workflows/recommender-deploy.yml`. Nothing manual needed
 after the one-time setup below.
 
-## One-time GCP setup (already done, recorded here for anyone who needs to redo it)
+## One-time GCP setup (must be done before the first deploy)
 
-1. Enable APIs: Cloud Run, Cloud Build, Artifact Registry, Secret Manager.
-2. Create a dedicated `recommender-deploy` service account with `run.admin`,
-   `artifactregistry.writer`, `secretmanager.secretAccessor`, and `iam.serviceAccountUser` —
-   not Owner/Editor. Store its key as the GitHub secret
-   `GCP_SERVICE_ACCOUNT_RECOMMENDER_DEPLOY`.
+1. Enable APIs: Cloud Run, Artifact Registry, Secret Manager.
+2. Create two dedicated service accounts — not Owner/Editor, and not the Compute Engine default:
+   - `recommender-deploy` (used by CI): `roles/run.admin` and `roles/artifactregistry.writer` on
+     the project, plus `roles/iam.serviceAccountUser` on `recommender-runtime` only. Store its
+     key as the GitHub secret `GCP_SERVICE_ACCOUNT_RECOMMENDER_DEPLOY`.
+   - `recommender-runtime` (the identity the Cloud Run service runs as): no project roles.
 3. Create an Artifact Registry Docker repository named `recommender-service` in `europe-west1`.
 4. Create a Secret Manager secret named `gemini-api-key` holding the real Gemini key, and grant
-   the deploy service account read access to it.
+   `roles/secretmanager.secretAccessor` on that secret to `recommender-runtime`. Cloud Run reads
+   secrets as the service's runtime identity, not as the account that deploys it.
 
 ## Manual smoke test after the first deploy
 
