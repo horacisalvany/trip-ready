@@ -1,0 +1,17 @@
+# Unconditional — needed under every profile, including prod (ProdProfileSmokeTest activates
+# it). Do not move this below the --- separator: that would scope it to the default profile
+# only, same as the block below, and silently reintroduce a context-startup failure under prod.
+app:
+  firebase:
+    project-id: ready4trip-5d3f6
+---
+# Only applies when no other profile is active (e.g. plain @WebMvcTest slices), so it does not
+# mask a dropped app.cors.allowed-origin in application-prod.yml when prod is explicitly active
+# (see ProdProfileSmokeTest).
+spring:
+  config:
+    activate:
+      on-profile: default
+app:
+  cors:
+    allowed-origin: http://localhost:4200

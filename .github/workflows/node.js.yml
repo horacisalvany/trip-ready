@@ -10,8 +10,10 @@ name: Node.js CI
 on:
   push:
     branches: [ "main" ]
+    paths-ignore: [ "recommender-service/**", "docs/**", ".github/workflows/recommender-deploy.yml" ]
   pull_request:
     branches: [ "main" ]
+    paths-ignore: [ "recommender-service/**", "docs/**", ".github/workflows/recommender-deploy.yml" ]
 
 jobs:
   build:

@@ -1,12 +1,12 @@
+server:
+  port: ${PORT:8080}
+
 spring:
   ai:
     google:
       genai:
         api-key: ${GEMINI_API_KEY}
 
-server:
-  port: 8080
-
 app:
   cors:
-    allowed-origin: http://localhost:4200
+    allowed-origin: https://ready4trip-5d3f6.web.app

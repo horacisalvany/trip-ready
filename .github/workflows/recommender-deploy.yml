@@ -1,0 +1,88 @@
+# Builds, tests, and deploys recommender-service to Cloud Run:
+#   - pull request  -> build + test only, no deploy
+#   - merge to main -> build, test, build a container image, push it, deploy to Cloud Run
+# Path-filtered: only runs on changes under recommender-service/, so Angular-only commits
+# never trigger this, mirroring node.js.yml's own path-ignore of this directory.
+
+name: Recommender Service CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+    paths: [ "recommender-service/**", ".github/workflows/recommender-deploy.yml" ]
+  pull_request:
+    branches: [ "main" ]
+    paths: [ "recommender-service/**", ".github/workflows/recommender-deploy.yml" ]
+
+env:
+  GCP_PROJECT_ID: ready4trip-5d3f6
+  GCP_REGION: europe-west1
+  ARTIFACT_REPO: recommender-service
+  CLOUD_RUN_SERVICE: recommender-service
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Run tests
+        working-directory: recommender-service
+        run: mvn -q test
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    runs-on: ubuntu-latest
+
+    # Serializes deploys: without this, two merges to main close together could run two
+    # concurrent gcloud run deploy calls with no ordering guarantee, and whichever finishes
+    # last "wins" regardless of which commit is actually newer.
+    concurrency:
+      group: recommender-deploy
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_RECOMMENDER_DEPLOY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Build the image
+        working-directory: recommender-service
+        run: |
+          docker build -t ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.CLOUD_RUN_SERVICE }}:${{ github.sha }} .
+
+      - name: Push the image
+        run: |
+          docker push ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.CLOUD_RUN_SERVICE }}:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.CLOUD_RUN_SERVICE }} \
+            --image ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REPO }}/${{ env.CLOUD_RUN_SERVICE }}:${{ github.sha }} \
+            --region ${{ env.GCP_REGION }} \
+            --project ${{ env.GCP_PROJECT_ID }} \
+            --allow-unauthenticated \
+            --max-instances 1 \
+            --service-account recommender-runtime@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com \
+            --set-env-vars SPRING_PROFILES_ACTIVE=prod \
+            --set-secrets GEMINI_API_KEY=gemini-api-key:latest
