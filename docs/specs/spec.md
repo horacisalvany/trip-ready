@@ -79,7 +79,7 @@ fails is a change the user believes they made and did not.
 
 - When a write fails, a message names what was not saved: `Could not save the new item. Please
   try again.`, and likewise for the mark, the deletion, the new name, the new order, the moved
-  item, the new list, the new group, the new section(s), the cleared marks.
+  item, the new list, the new group, the new section(s), the cleared marks, the new note.
 - One user action, one message: clearing every mark rewrites a node per marked section and
   dragging an item between sections rewrites both of them, and each still reports once.
 - The message is dismissible and blocks nothing. Nothing on the screen becomes read-only, and
@@ -152,8 +152,9 @@ picked.
 
 - A `auto_awesome` button on the list header, immediately before the `+` button, opens the
   suggestions dialog.
-- The trip note has its own small affordance on the list header — a `notes` icon and, once set, a
-  short preview of the note. Tapping it opens a dialog with the current note pre-filled, the same
+- The trip note has its own small affordance on the list header — on a row of its own under the
+  title, a `notes` icon and, once set, a one-line preview of the note (cut off with an ellipsis
+  when it does not fit). Tapping it opens a dialog with the current note pre-filled, the same
   tap-to-edit pattern used for renaming a section or a group. Unlike a title, a blank note is
   allowed and clears it; up to 200 characters.
 - The suggestions dialog shows the current note (read-only, with a pencil into the same edit

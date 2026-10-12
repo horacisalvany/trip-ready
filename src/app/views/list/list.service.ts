@@ -10,6 +10,14 @@ import { Section } from './section';
 
 export const UNGROUPED_SECTION_TITLE = 'Ungrouped';
 
+/*
+  A blank note is a cleared note, not an empty string: `null` makes Firebase
+  remove the field, so a list with no note looks the same however it got there.
+ */
+function storedNote(note: string): string | null {
+  return note.trim() || null;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -86,6 +94,7 @@ export class ListService {
                 id,
                 title: data.title,
                 sections: this.parseSections(data.sections),
+                tripNote: data.tripNote,
               } as List;
             })
           );
@@ -251,6 +260,24 @@ export class ListService {
     );
   }
 
+  /*
+    `update` on the list node itself, so the title and sections beside the note
+    are untouched.
+   */
+  updateTripNote(listId: string, note: string): Observable<void> {
+    return this.userPath().pipe(
+      take(1),
+      switchMap((path) => {
+        if (!path) return of(undefined as void);
+        return from(
+          this.db
+            .object(`${path}/lists/${listId}`)
+            .update({ tripNote: storedNote(note) })
+        );
+      })
+    );
+  }
+
   getSharedList(id: string): Observable<List | undefined> {
     return this.db
       .object(`sharedLists/${id}`)
@@ -262,6 +289,7 @@ export class ListService {
             id,
             title: data.title,
             sections: this.parseSections(data.sections),
+            tripNote: data.tripNote,
             ownerUid: data.ownerUid,
             ownerEmail: data.ownerEmail,
             sharedWith: data.sharedWith,
@@ -314,6 +342,16 @@ export class ListService {
       this.db
         .object(`sharedLists/${listId}/sections/${sectionId}`)
         .update({ title })
+    );
+  }
+
+  /*
+    No take(1): the shared node is addressed by list id alone, so this never
+    reads the long-lived user$ stream.
+   */
+  updateSharedTripNote(listId: string, note: string): Observable<void> {
+    return from(
+      this.db.object(`sharedLists/${listId}`).update({ tripNote: storedNote(note) })
     );
   }
 

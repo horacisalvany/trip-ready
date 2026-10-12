@@ -1,0 +1,33 @@
+/*
+  Styled like the rename dialog's field so editing a note and renaming a section
+  feel like the same control, only taller.
+ */
+.note-text {
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  border-bottom: 1px solid #cbd5e1;
+  outline: none;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 16px;
+  resize: vertical;
+
+  &:focus {
+    border-bottom-color: #3f51b5;
+  }
+}
+
+.note-count {
+  text-align: right;
+  color: #94a3b8;
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.error-message {
+  color: #f44336;
+  font-size: 12px;
+  margin-top: 8px;
+  margin-bottom: 0;
+}

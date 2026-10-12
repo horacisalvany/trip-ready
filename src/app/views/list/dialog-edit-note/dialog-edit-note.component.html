@@ -1,0 +1,24 @@
+<h2 mat-dialog-title>Trip note</h2>
+<mat-dialog-content>
+  <!--
+    A plain textarea rather than a mat-form-field, for the same reason as the
+    rename dialog's input: the outline border cuts through the floating label.
+  -->
+  <textarea
+    cdkFocusInitial
+    class="note-text"
+    [(ngModel)]="note"
+    rows="4"
+    [attr.maxlength]="maxLength"
+    placeholder="Ex. 2 weeks Japan in November, with a toddler"
+    aria-label="Trip note"
+  ></textarea>
+  <p class="note-count">{{ note.length }}/{{ maxLength }}</p>
+  <p class="error-message" *ngIf="errorMessage">{{ errorMessage }}</p>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" class="save" (click)="onSave()">
+    Save
+  </button>
+</mat-dialog-actions>

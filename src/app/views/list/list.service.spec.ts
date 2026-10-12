@@ -530,4 +530,100 @@ describe('ListService', () => {
       });
     });
   });
+
+  /*
+    The trip note (F12) sits beside the title on the list node, under the same
+    name the recommender's request uses, so it can be sent as it is stored.
+   */
+  describe('trip note', () => {
+    it('should read the note of a private list', (done) => {
+      mockDbObject.valueChanges.and.returnValue(
+        of({ title: 'Trip', sections: {}, tripNote: '1 week skiing' })
+      );
+
+      service.getList('l1').subscribe((list) => {
+        expect(list!.tripNote).toBe('1 week skiing');
+        done();
+      });
+    });
+
+    it('should read the note of a shared list', (done) => {
+      mockDbObject.valueChanges.and.returnValue(
+        of({ title: 'Trip', sections: {}, tripNote: '1 week skiing' })
+      );
+
+      service.getSharedList('sharedId1').subscribe((list) => {
+        expect(list!.tripNote).toBe('1 week skiing');
+        done();
+      });
+    });
+
+    it('should leave the note undefined on a list that has none', (done) => {
+      mockDbObject.valueChanges.and.returnValue(of({ title: 'Trip', sections: {} }));
+
+      service.getList('l1').subscribe((list) => {
+        expect(list!.tripNote).toBeUndefined();
+        done();
+      });
+    });
+
+    describe('updateTripNote', () => {
+      beforeEach(() => mockDbObject.update.and.returnValue(Promise.resolve()));
+
+      /* `update`, not `set`: the title and sections on the same node survive. */
+      it('should update the note on the list node under the user lists path', (done) => {
+        service.updateTripNote('l1', '1 week skiing').subscribe(() => {
+          expect(mockDb.object).toHaveBeenCalledWith('users/testUid/lists/l1');
+          expect(mockDbObject.update).toHaveBeenCalledWith({ tripNote: '1 week skiing' });
+          done();
+        });
+      });
+
+      it('should store the note trimmed', (done) => {
+        service.updateTripNote('l1', '  1 week skiing  ').subscribe(() => {
+          expect(mockDbObject.update).toHaveBeenCalledWith({ tripNote: '1 week skiing' });
+          done();
+        });
+      });
+
+      /* Writing null removes the field rather than storing an empty string. */
+      it('should clear the note when it is blank', (done) => {
+        service.updateTripNote('l1', '   ').subscribe(() => {
+          expect(mockDbObject.update).toHaveBeenCalledWith({ tripNote: null });
+          done();
+        });
+      });
+
+      /* The write rule in CLAUDE.md. */
+      it('should write once even when the auth user changes afterwards', () => {
+        const user$ = new BehaviorSubject<{ uid: string } | null>({ uid: 'testUid' });
+        const isolatedService = new ListService(mockDb, { user$ } as any);
+
+        isolatedService.updateTripNote('l1', '1 week skiing').subscribe();
+        user$.next({ uid: 'otherUid' });
+
+        expect(mockDbObject.update).toHaveBeenCalledTimes(1);
+        expect(mockDb.object).not.toHaveBeenCalledWith('users/otherUid/lists/l1');
+      });
+    });
+
+    describe('updateSharedTripNote', () => {
+      beforeEach(() => mockDbObject.update.and.returnValue(Promise.resolve()));
+
+      it('should update the note on the sharedLists node', (done) => {
+        service.updateSharedTripNote('sharedId1', ' 1 week skiing ').subscribe(() => {
+          expect(mockDb.object).toHaveBeenCalledWith('sharedLists/sharedId1');
+          expect(mockDbObject.update).toHaveBeenCalledWith({ tripNote: '1 week skiing' });
+          done();
+        });
+      });
+
+      it('should clear the note when it is blank', (done) => {
+        service.updateSharedTripNote('sharedId1', '').subscribe(() => {
+          expect(mockDbObject.update).toHaveBeenCalledWith({ tripNote: null });
+          done();
+        });
+      });
+    });
+  });
 });
