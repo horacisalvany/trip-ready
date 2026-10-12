@@ -136,10 +136,12 @@ is only used afterwards, by the existing write paths, to save the note and to ad
 
 **`feature/F12-trip-note`**
 
-- `src/app/services/list.service.ts` — the trip note field alongside `title` on the stored list,
+- `src/app/views/list/list.service.ts` — the trip note field alongside `title` on the stored list,
   read and write (write via `take(1)`, per `CLAUDE.md`)
 - `src/app/views/list/dialog-edit-note/` (new) — edit dialog, reusing the tap-to-edit pattern of
   `dialog-rename` but allowing a blank value
+- `src/app/services/share.service.ts` — carry the note when a list is first shared and when a
+  deleted shared list is restored to its owner; both copy the list node field by field
 - `src/app/views/list/list.component.ts` / `.html` — the header affordance, its preview state
 - `docs/specs/spec.md` — the trip note bullet under **Lists**, and the note-related bullets of
   **Item Recommender**
@@ -158,6 +160,8 @@ is only used afterwards, by the existing write paths, to save the note and to ad
 **`feature/F12-trip-note`**
 
 - `ListService`: the note is read and written alongside the title; a write uses `take(1)`.
+- `ShareService`: the note survives a first share and a delete-restore, and an absent note stays
+  absent (Firebase rejects `undefined`).
 - The edit dialog: pre-fills the current note; a blank value is accepted and clears it (unlike
   `dialog-rename`); a value over 200 characters is rejected.
 - `ListComponent`: the header affordance shows a preview once a note is set, and the unset state

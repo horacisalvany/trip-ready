@@ -15,6 +15,7 @@ import { ListService, UNGROUPED_SECTION_TITLE } from './list.service';
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
 import { DialogRenameComponent } from '../dialog-rename/dialog-rename.component';
 import { DialogConfirmComponent } from '../dialog-confirm/dialog-confirm.component';
+import { DialogEditNoteComponent } from './dialog-edit-note/dialog-edit-note.component';
 import { AddSectionsResult } from './dialog-add-group/dialog-add-group.component';
 import { GroupService } from '../group/group.service';
 import { AuthService } from '../../services/auth.service';
@@ -122,6 +123,8 @@ describe('ListComponent', () => {
       'updateSharedSectionItems',
       'updateSharedItemAt',
       'renameSharedSection',
+      'updateTripNote',
+      'updateSharedTripNote',
     ]);
     mockListService.getList.and.returnValue(
       of({ ...MOCK_LIST, sections: copySections(MOCK_LIST.sections) })
@@ -140,6 +143,8 @@ describe('ListComponent', () => {
     mockListService.renameSharedSection.and.returnValue(of(undefined));
     mockListService.updateItemAt.and.returnValue(of(undefined));
     mockListService.updateSharedItemAt.and.returnValue(of(undefined));
+    mockListService.updateTripNote.and.returnValue(of(undefined));
+    mockListService.updateSharedTripNote.and.returnValue(of(undefined));
 
     mockGroupService = jasmine.createSpyObj('GroupService', ['getGroups']);
     mockGroupService.getGroups.and.returnValue(
@@ -2025,6 +2030,131 @@ describe('ListComponent', () => {
       component.onAddItemToSection('s1', 'Sunglasses');
 
       expect(snackBar.open).not.toHaveBeenCalled();
+    });
+  });
+
+  /*
+    The trip note (F12): its own row under the title, an icon alone while unset
+    and a one-line preview once set. Tapping it opens the edit dialog.
+   */
+  describe('trip note', () => {
+    function noteButton() {
+      return fixture.debugElement.query(By.css('.trip-note'));
+    }
+
+    function preview(): string | null {
+      const el = fixture.debugElement.query(By.css('.trip-note-preview'));
+      return el ? el.nativeElement.textContent.trim() : null;
+    }
+
+    function showNote(tripNote: string | undefined): void {
+      component.list = { ...component.list!, tripNote };
+      fixture.detectChanges();
+    }
+
+    function stubDialog(closesWith: string | undefined) {
+      const dialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
+      dialogRef.afterClosed.and.returnValue(of(closesWith));
+      return spyOn(component.dialog, 'open').and.returnValue(dialogRef);
+    }
+
+    it('should show only the notes icon when the list has no note', () => {
+      showNote(undefined);
+
+      expect(noteButton().query(By.css('mat-icon')).nativeElement.textContent.trim()).toBe(
+        'notes'
+      );
+      expect(preview()).toBeNull();
+    });
+
+    it('should preview the note once one is set', () => {
+      showNote('1 week skiing, Feb, 2 adults + kid');
+
+      expect(preview()).toBe('1 week skiing, Feb, 2 adults + kid');
+    });
+
+    /* With no preview to read, the label is the only thing naming the control. */
+    it('should label the control for screen readers', () => {
+      showNote(undefined);
+      expect(noteButton().nativeElement.getAttribute('aria-label')).toBe('Add a trip note');
+
+      showNote('1 week skiing');
+      expect(noteButton().nativeElement.getAttribute('aria-label')).toBe('Edit the trip note');
+    });
+
+    it('should open the dialog prefilled with the current note when tapped', () => {
+      showNote('1 week skiing');
+      const open = stubDialog(undefined);
+
+      noteButton().triggerEventHandler('click', {});
+
+      expect(open).toHaveBeenCalledWith(
+        DialogEditNoteComponent,
+        jasmine.objectContaining({ data: { note: '1 week skiing' } })
+      );
+    });
+
+    it('should save the note the dialog returns', () => {
+      stubDialog('2 weeks Japan');
+
+      component.openNoteDialog();
+
+      expect(mockListService.updateTripNote).toHaveBeenCalledWith('list1', '2 weeks Japan');
+    });
+
+    /* '' is the dialog's "clear" — the service turns it into a removed field. */
+    it('should write the clear when the dialog returns a blank note', () => {
+      showNote('1 week skiing');
+      stubDialog('');
+
+      component.openNoteDialog();
+
+      expect(mockListService.updateTripNote).toHaveBeenCalledWith('list1', '');
+    });
+
+    it('should write nothing when the dialog closes without a value', () => {
+      stubDialog(undefined);
+
+      component.openNoteDialog();
+
+      expect(mockListService.updateTripNote).not.toHaveBeenCalled();
+      expect(mockListService.updateSharedTripNote).not.toHaveBeenCalled();
+    });
+
+    /* Owner and recipients alike — anyone who can edit the list. */
+    it('should save to the shared node on a shared list', () => {
+      component.isShared = true;
+      stubDialog('2 weeks Japan');
+
+      component.openNoteDialog();
+
+      expect(mockListService.updateSharedTripNote).toHaveBeenCalledWith(
+        'list1',
+        '2 weeks Japan'
+      );
+      expect(mockListService.updateTripNote).not.toHaveBeenCalled();
+    });
+
+    it('should not open the dialog when the list is undefined', () => {
+      const open = stubDialog('2 weeks Japan');
+      component.list = undefined;
+
+      component.openNoteDialog();
+
+      expect(open).not.toHaveBeenCalled();
+    });
+
+    it('should tell the user the new note was not saved', () => {
+      mockListService.updateTripNote.and.returnValue(throwError(() => new Error('offline')));
+      stubDialog('2 weeks Japan');
+
+      component.openNoteDialog();
+
+      expect(snackBar.open).toHaveBeenCalledWith(
+        'Could not save the new note. Please try again.',
+        'OK',
+        jasmine.any(Object)
+      );
     });
   });
 });

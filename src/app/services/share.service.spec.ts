@@ -204,9 +204,82 @@ describe('ShareService', () => {
         },
       });
     });
+
+    /*
+      The trip note (F12) lives on the list node, so publishing a list has to
+      carry it or the note is lost the moment the list is first shared.
+     */
+    it('should publish the trip note with the list on first share', (done) => {
+      const db = stubObjectsByPath((path) =>
+        path === 'users/ownerUid/lists/list1'
+          ? { title: 'Vacation', sections: {}, tripNote: '1 week skiing' }
+          : null
+      );
+
+      service.shareList('list1', 'targetUid', 'target@test.com').subscribe({
+        next: () => {
+          expect(db.setArgs('sharedLists/list1')[0]?.[0]?.tripNote).toBe('1 week skiing');
+          done();
+        },
+        error: done.fail,
+      });
+    });
+
+    /* Firebase rejects a write containing `undefined`, so an absent note stays absent. */
+    it('should publish no trip note key when the list has none', (done) => {
+      const db = stubObjectsByPath((path) =>
+        path === 'users/ownerUid/lists/list1' ? { title: 'Vacation', sections: {} } : null
+      );
+
+      service.shareList('list1', 'targetUid', 'target@test.com').subscribe({
+        next: () => {
+          const published = db.setArgs('sharedLists/list1')[0]?.[0] ?? {};
+          expect('tripNote' in published).toBeFalse();
+          done();
+        },
+        error: done.fail,
+      });
+    });
   });
 
   describe('deleteSharedList', () => {
+    /* Restored is restored "with its current content" — the note included. */
+    function restoredListFor(sharedListData: object, done: DoneFn, check: (restored: any) => void) {
+      const restoreSet = jasmine.createSpy('set').and.returnValue(Promise.resolve());
+      mockDb.object.and.callFake((path: string) => {
+        const obj = jasmine.createSpyObj('AngularFireObject', ['valueChanges', 'set', 'remove']);
+        obj.set.and.returnValue(Promise.resolve());
+        obj.remove.and.returnValue(Promise.resolve());
+        if (path === 'sharedLists/list1') obj.valueChanges.and.returnValue(of(sharedListData));
+        if (path === 'users/ownerUid/lists/list1') obj.set = restoreSet;
+        return obj;
+      });
+
+      service.deleteSharedList('list1').subscribe({
+        next: () => {
+          check(restoreSet.calls.mostRecent()?.args[0]);
+          done();
+        },
+        error: done.fail,
+      });
+    }
+
+    it('should restore the trip note to the owner', (done) => {
+      restoredListFor(
+        { title: 'Beach Trip', sections: {}, tripNote: '1 week skiing', ownerUid: 'ownerUid' },
+        done,
+        (restored) => expect(restored.tripNote).toBe('1 week skiing')
+      );
+    });
+
+    it('should restore no trip note key when the shared list has none', (done) => {
+      restoredListFor(
+        { title: 'Beach Trip', sections: {}, ownerUid: 'ownerUid' },
+        done,
+        (restored) => expect('tripNote' in restored).toBeFalse()
+      );
+    });
+
     it('should remove the shared list and all user references', (done) => {
       const sharedListData = {
         title: 'Beach Trip',

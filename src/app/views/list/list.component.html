@@ -59,6 +59,21 @@
     </button>
   </div>
   <!--
+    Its own row rather than another header button: the header already carries up
+    to five on a phone. Unset, it is the icon alone; once set, a one-line preview
+    of the note that ellipses rather than wraps.
+  -->
+  <button
+    type="button"
+    class="trip-note"
+    (click)="openNoteDialog()"
+    [title]="tripNoteLabel"
+    [attr.aria-label]="tripNoteLabel"
+  >
+    <mat-icon>notes</mat-icon>
+    <span *ngIf="list?.tripNote" class="trip-note-preview">{{ list?.tripNote }}</span>
+  </button>
+  <!--
     The sections live inside their own drop list: a cdkDrag can only be dropped
     on a list its container is connected to, and CdkDrag resolves that container
     with @SkipSelf() — a cdkDropList on the section element itself is ignored.

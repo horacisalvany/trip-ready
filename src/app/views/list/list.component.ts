@@ -28,6 +28,10 @@ import {
   RenameDialogData,
 } from '../dialog-rename/dialog-rename.component';
 import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.component';
+import {
+  DialogEditNoteComponent,
+  EditNoteDialogData,
+} from './dialog-edit-note/dialog-edit-note.component';
 import { Item } from './item';
 import { ListService } from './list.service';
 import { Section } from './section';
@@ -371,6 +375,33 @@ export class ListComponent implements OnInit {
         ? this.listService.renameSharedSection(this.list.id, section.id, title)
         : this.listService.renameSection(this.list.id, section.id, title);
       this.writeFeedback.report(obs, 'the new name');
+    });
+  }
+
+  get tripNoteLabel(): string {
+    return this.list?.tripNote ? 'Edit the trip note' : 'Add a trip note';
+  }
+
+  /*
+    The one place the trip note is edited (F12). The dialog closes with
+    `undefined` when there is nothing to write and with '' for a cleared note,
+    which the service stores as no note at all.
+   */
+  openNoteDialog(): void {
+    if (!this.list) return;
+
+    const data: EditNoteDialogData = { note: this.list.tripNote };
+    const dialogRef = this.dialog.open(DialogEditNoteComponent, {
+      width: '300px',
+      data,
+    });
+
+    dialogRef.afterClosed().subscribe((note: string | undefined) => {
+      if (note === undefined || !this.list) return;
+      const obs = this.isShared
+        ? this.listService.updateSharedTripNote(this.list.id, note)
+        : this.listService.updateTripNote(this.list.id, note);
+      this.writeFeedback.report(obs, 'the new note');
     });
   }
 

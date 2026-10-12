@@ -14,6 +14,15 @@ import { AuthService } from './auth.service';
 */
 export const NOT_LIST_OWNER_ERROR = 'not-list-owner';
 
+/*
+  The trip note (F12) for a list copied between private and shared storage, as
+  something to spread into the copy. Empty when there is none: Firebase rejects
+  a write that holds `undefined`, so an absent note has to stay absent.
+*/
+function tripNoteOf(listData: { tripNote?: string }): { tripNote?: string } {
+  return listData.tripNote ? { tripNote: listData.tripNote } : {};
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -121,6 +130,7 @@ export class ShareService {
                     const sharedListData = {
                       title: listData.title,
                       sections: listData.sections ?? {},
+                      ...tripNoteOf(listData),
                       ownerUid: callerUid,
                       ownerEmail: callerEmail,
                       sharedWith: { [targetUid]: targetEmail },
@@ -167,9 +177,10 @@ export class ShareService {
               // Restore list to owner's personal lists, remove sharedListIds for all users,
               // and remove the shared list node itself
               const { ownerUid: owner, title, sections } = data;
+              const restored = { title, sections: sections ?? {}, ...tripNoteOf(data) };
               const writes: Observable<any>[] = [
                 from(this.db.object(`sharedLists/${listId}`).remove()),
-                from(this.db.object(`users/${owner}/lists/${listId}`).set({ title, sections: sections ?? {} })),
+                from(this.db.object(`users/${owner}/lists/${listId}`).set(restored)),
                 ...Array.from(uids).map((uid) =>
                   from(this.db.object(`users/${uid}/sharedListIds/${listId}`).remove())
                 ),

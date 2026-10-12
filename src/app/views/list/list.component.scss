@@ -19,6 +19,46 @@
 
 @include rename-hint(".section-header");
 
+/*
+  A plain button styled as text, so the note reads as part of the header rather
+  than as another control competing with the icon buttons above it.
+ */
+.trip-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin: 0 0 8px;
+  padding: 2px 4px;
+  border: none;
+  background: none;
+  color: #64748b;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    opacity: 0.7;
+  }
+
+  &:hover mat-icon,
+  &:active mat-icon {
+    opacity: 1;
+  }
+}
+
+.trip-note-preview {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .shared-with-info {
   color: #9c27b0;
   opacity: 0.7;
