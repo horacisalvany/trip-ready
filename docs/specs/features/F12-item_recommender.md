@@ -150,9 +150,14 @@ is only used afterwards, by the existing write paths, to save the note and to ad
 
 - `src/app/services/recommender.service.ts` (new) + spec — the HTTP call and error mapping
 - `src/app/views/list/dialog-suggest-items/` (new) — dialog component, template, styles, spec;
-  opens `dialog-edit-note` for its pencil rather than re-implementing note editing
+  its pencil calls back into `ListComponent`'s note editing, which opens `dialog-edit-note`, rather
+  than re-implementing it. `suggestions.ts` holds the section-matching function and the client-side
+  dedupe-and-cap
 - `src/app/views/list/list.component.ts` / `.html` — the `auto_awesome` button, wiring accepted
   suggestions into the existing add-item and add-section paths
+- `src/app/app.module.ts` — `HttpClientModule`, the app's first HTTP call
+- `src/environments/environment.ts` / `environment.prod.ts` (new), `angular.json` — `recommenderUrl`
+  (`localhost:8080` for `ng serve`, the Cloud Run URL for production builds) via `fileReplacements`
 - `docs/specs/spec.md` — the remaining bullets of **Item Recommender**
 
 ### Tests

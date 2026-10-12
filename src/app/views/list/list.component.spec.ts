@@ -16,6 +16,11 @@ import { DialogShareListComponent } from './dialog-share-list/dialog-share-list.
 import { DialogRenameComponent } from '../dialog-rename/dialog-rename.component';
 import { DialogConfirmComponent } from '../dialog-confirm/dialog-confirm.component';
 import { DialogEditNoteComponent } from './dialog-edit-note/dialog-edit-note.component';
+import {
+  DialogSuggestItemsComponent,
+  SuggestItemsDialogData,
+} from './dialog-suggest-items/dialog-suggest-items.component';
+import { Suggestion } from '../../services/recommender.service';
 import { AddSectionsResult } from './dialog-add-group/dialog-add-group.component';
 import { GroupService } from '../group/group.service';
 import { AuthService } from '../../services/auth.service';
@@ -971,7 +976,7 @@ describe('ListComponent', () => {
         .queryAll(By.css('.button-row button'))
         .map((el) => el.query(By.css('mat-icon')).nativeElement.textContent.trim());
 
-      expect(buttons).toEqual(['share', 'unfold_less', 'playlist_add_check', 'add']);
+      expect(buttons).toEqual(['share', 'unfold_less', 'playlist_add_check', 'auto_awesome', 'add']);
     });
 
     it('should collapse every section when clicked while expanded', () => {
@@ -1066,12 +1071,12 @@ describe('ListComponent', () => {
       expect(toggleIcon()).toBe('playlist_add_check');
     });
 
-    it('should sit between the collapse and add buttons', () => {
+    it('should sit between the collapse and suggest buttons', () => {
       const buttons = fixture.debugElement
         .queryAll(By.css('.button-row button'))
         .map((el) => el.query(By.css('mat-icon')).nativeElement.textContent.trim());
 
-      expect(buttons).toEqual(['share', 'unfold_less', 'playlist_add_check', 'add']);
+      expect(buttons).toEqual(['share', 'unfold_less', 'playlist_add_check', 'auto_awesome', 'add']);
     });
 
     it('should turn checklist mode on when clicked', () => {
@@ -2155,6 +2160,229 @@ describe('ListComponent', () => {
         'OK',
         jasmine.any(Object)
       );
+    });
+  });
+
+  /*
+    The suggestions dialog (F12) writes nothing itself; it closes with the
+    suggestions the user kept ticked, and the list adds them through the same
+    paths as any other new item or section.
+   */
+  describe('suggesting items', () => {
+    function suggestion(name: string, section: string): Suggestion {
+      return { name, section, reason: 'Because.' };
+    }
+
+    function stubDialog(closesWith: unknown) {
+      const dialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
+      dialogRef.afterClosed.and.returnValue(of(closesWith));
+      return spyOn(component.dialog, 'open').and.returnValue(dialogRef);
+    }
+
+    function headerIcons(): string[] {
+      return fixture.debugElement
+        .queryAll(By.css('.button-row button mat-icon'))
+        .map((el) => el.nativeElement.textContent.trim());
+    }
+
+    it('should sit immediately before the + button', () => {
+      const icons = headerIcons();
+
+      expect(icons.indexOf('auto_awesome')).toBe(icons.indexOf('add') - 1);
+    });
+
+    /* Anyone who can edit the list — a recipient sees it as the owner does. */
+    it('should be offered on a shared list to a recipient', () => {
+      component.list = { ...component.list!, isShared: true, ownerUid: 'someoneElse' };
+      fixture.detectChanges();
+
+      expect(headerIcons()).toContain('auto_awesome');
+    });
+
+    it('should open the dialog with the list', () => {
+      const open = stubDialog(undefined);
+
+      fixture.debugElement.query(By.css('.suggest-items')).triggerEventHandler('click', {});
+
+      expect(open).toHaveBeenCalledWith(
+        DialogSuggestItemsComponent,
+        jasmine.objectContaining({
+          data: jasmine.objectContaining({ list: component.list }),
+        })
+      );
+    });
+
+    it('should add a suggestion to the section it matches, unmarked', () => {
+      const writes = recordItemWrites(mockListService.updateSectionItems);
+      stubDialog([suggestion('Adapter', ' electronics ')]);
+
+      component.openSuggestDialog();
+
+      expect(writes).toEqual([
+        [
+          'list1',
+          's2',
+          [...unmarkedItems(['Phone', 'Charger']), { name: 'Adapter', checked: false }],
+        ],
+      ]);
+      expect(mockListService.addEmptySectionToList).not.toHaveBeenCalled();
+    });
+
+    /* A marked item stays marked; only the new ones come in unmarked. */
+    it('should keep the marks already on the section it adds to', () => {
+      component.list!.sections[1].items[0].checked = true;
+      const writes = recordItemWrites(mockListService.updateSectionItems);
+      stubDialog([suggestion('Visa', 'Packing')]);
+
+      component.openSuggestDialog();
+
+      expect(writes[0][2]).toEqual([
+        { name: 'Passport', checked: true },
+        { name: 'Tickets', checked: false },
+        { name: 'Visa', checked: false },
+      ]);
+    });
+
+    it('should write each section once, however many suggestions land in it', () => {
+      const writes = recordItemWrites(mockListService.updateSectionItems);
+      stubDialog([suggestion('Adapter', 'Electronics'), suggestion('Power bank', 'electronics')]);
+
+      component.openSuggestDialog();
+
+      expect(writes.length).toBe(1);
+      expect(writes[0][2].map((item) => item.name)).toEqual([
+        'Phone',
+        'Charger',
+        'Adapter',
+        'Power bank',
+      ]);
+    });
+
+    it('should create a section for a suggestion that matches none, and fill it', () => {
+      mockListService.addEmptySectionToList.and.returnValue(of('newSec'));
+      const writes = recordItemWrites(mockListService.updateSectionItems);
+      stubDialog([suggestion('Sunscreen', ' Toiletries ')]);
+
+      component.openSuggestDialog();
+
+      expect(mockListService.addEmptySectionToList).toHaveBeenCalledOnceWith('list1', 'Toiletries');
+      expect(writes).toEqual([['list1', 'newSec', [{ name: 'Sunscreen', checked: false }]]]);
+    });
+
+    it('should create one new section for suggestions naming it in different cases', () => {
+      mockListService.addEmptySectionToList.and.returnValue(of('newSec'));
+      const writes = recordItemWrites(mockListService.updateSectionItems);
+      stubDialog([suggestion('Sunscreen', 'Toiletries'), suggestion('Lip balm', 'toiletries')]);
+
+      component.openSuggestDialog();
+
+      expect(mockListService.addEmptySectionToList).toHaveBeenCalledOnceWith('list1', 'Toiletries');
+      expect(writes[0][2].map((item) => item.name)).toEqual(['Sunscreen', 'Lip balm']);
+    });
+
+    it('should use the shared paths on a shared list', () => {
+      component.isShared = true;
+      mockListService.addEmptySharedSectionToList.and.returnValue(of('newSec'));
+      stubDialog([suggestion('Adapter', 'Electronics'), suggestion('Sunscreen', 'Toiletries')]);
+
+      component.openSuggestDialog();
+
+      expect(mockListService.updateSharedSectionItems).toHaveBeenCalledWith(
+        'list1',
+        's2',
+        jasmine.any(Array)
+      );
+      expect(mockListService.addEmptySharedSectionToList).toHaveBeenCalledWith('list1', 'Toiletries');
+      expect(mockListService.updateSharedSectionItems).toHaveBeenCalledWith(
+        'list1',
+        'newSec',
+        [{ name: 'Sunscreen', checked: false }]
+      );
+      expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
+      expect(mockListService.addEmptySectionToList).not.toHaveBeenCalled();
+    });
+
+    for (const closesWith of [undefined, []]) {
+      it(`should write nothing when the dialog closes with ${JSON.stringify(closesWith)}`, () => {
+        stubDialog(closesWith);
+
+        component.openSuggestDialog();
+
+        expect(mockListService.updateSectionItems).not.toHaveBeenCalled();
+        expect(mockListService.addEmptySectionToList).not.toHaveBeenCalled();
+      });
+    }
+
+    it('should not open the dialog when the list is undefined', () => {
+      const open = stubDialog(undefined);
+      component.list = undefined;
+
+      component.openSuggestDialog();
+
+      expect(open).not.toHaveBeenCalled();
+    });
+
+    /* One confirm, one message, however many sections it wrote. */
+    it('should report a failed add once, naming the new items', () => {
+      mockListService.updateSectionItems.and.returnValue(throwError(() => new Error('offline')));
+      mockListService.addEmptySectionToList.and.returnValue(of('newSec'));
+      stubDialog([suggestion('Adapter', 'Electronics'), suggestion('Sunscreen', 'Toiletries')]);
+
+      component.openSuggestDialog();
+
+      expect(snackBar.open).toHaveBeenCalledOnceWith(
+        'Could not save the new items. Please try again.',
+        'OK',
+        jasmine.any(Object)
+      );
+    });
+
+    it('should name a single failed suggestion as the new item', () => {
+      mockListService.updateSectionItems.and.returnValue(throwError(() => new Error('offline')));
+      stubDialog([suggestion('Adapter', 'Electronics')]);
+
+      component.openSuggestDialog();
+
+      expect(snackBar.open).toHaveBeenCalledWith(
+        'Could not save the new item. Please try again.',
+        'OK',
+        jasmine.any(Object)
+      );
+    });
+
+    /*
+      The dialog's pencil goes through the list's own note editing, so a note
+      edited there is written exactly as one edited from the header.
+     */
+    describe("the dialog's note pencil", () => {
+      function editNoteFromDialog(noteDialogClosesWith: string | undefined): string[] {
+        const open = stubDialog(undefined);
+        component.openSuggestDialog();
+        const data = open.calls.mostRecent().args[1]!.data as SuggestItemsDialogData;
+
+        const noteRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
+        noteRef.afterClosed.and.returnValue(of(noteDialogClosesWith));
+        open.and.returnValue(noteRef);
+
+        const emitted: string[] = [];
+        data.editNote().subscribe((note) => emitted.push(note));
+        expect(open).toHaveBeenCalledWith(DialogEditNoteComponent, jasmine.any(Object));
+        return emitted;
+      }
+
+      it('should save the note and hand it back to the dialog', () => {
+        const emitted = editNoteFromDialog('2 weeks Japan');
+
+        expect(mockListService.updateTripNote).toHaveBeenCalledWith('list1', '2 weeks Japan');
+        expect(emitted).toEqual(['2 weeks Japan']);
+      });
+
+      it('should hand nothing back, and write nothing, when the note is unchanged', () => {
+        const emitted = editNoteFromDialog(undefined);
+
+        expect(mockListService.updateTripNote).not.toHaveBeenCalled();
+        expect(emitted).toEqual([]);
+      });
     });
   });
 });

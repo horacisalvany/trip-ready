@@ -1,0 +1,92 @@
+.note-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.note-icon {
+  flex-shrink: 0;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  opacity: 0.7;
+}
+
+.note-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+
+  &.unset {
+    font-style: italic;
+  }
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.suggestions {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.suggestion {
+  padding: 4px 0;
+
+  & + & {
+    border-top: 1px solid #e2e8f0;
+  }
+}
+
+.suggestion-name {
+  font-weight: 500;
+}
+
+/* Lined up under the label, past the checkbox's own 40px touch target. */
+.suggestion-detail {
+  padding-left: 40px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.suggestion-section {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.section-arrow {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+}
+
+.new-section {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: #f3e5f5;
+  color: #9c27b0;
+  font-size: 11px;
+}
+
+.suggestion-reason {
+  margin: 2px 0 0;
+}
+
+.empty {
+  margin: 16px 0 0;
+}
+
+.error-message {
+  color: #f44336;
+  font-size: 12px;
+  margin-top: 8px;
+  margin-bottom: 0;
+}

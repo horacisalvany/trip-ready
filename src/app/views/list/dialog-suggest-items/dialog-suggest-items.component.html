@@ -1,0 +1,64 @@
+<h2 mat-dialog-title>Suggest missing items</h2>
+<mat-dialog-content>
+  <!-- Read-only here: the pencil opens the same note dialog as the list header. -->
+  <div class="note-row">
+    <mat-icon class="note-icon">notes</mat-icon>
+    <span class="note-text" [class.unset]="!note">{{ note || 'No trip note' }}</span>
+    <button
+      mat-icon-button
+      class="edit-note"
+      title="Edit the trip note"
+      aria-label="Edit the trip note"
+      [disabled]="loading"
+      (click)="onEditNote()"
+    >
+      <mat-icon>edit</mat-icon>
+    </button>
+  </div>
+
+  <div class="loading" *ngIf="loading">
+    <mat-spinner diameter="32"></mat-spinner>
+  </div>
+
+  <ul class="suggestions" *ngIf="rows.length">
+    <li class="suggestion" *ngFor="let row of rows">
+      <mat-checkbox [(ngModel)]="row.checked">
+        <span class="suggestion-name">{{ row.suggestion.name }}</span>
+      </mat-checkbox>
+      <div class="suggestion-detail">
+        <span class="suggestion-section">
+          <mat-icon class="section-arrow" aria-hidden="true">arrow_forward</mat-icon>
+          <span class="section-title">{{ row.sectionTitle }}</span>
+          <span class="new-section" *ngIf="row.isNewSection">new section</span>
+        </span>
+        <p class="suggestion-reason">{{ row.suggestion.reason }}</p>
+      </div>
+    </li>
+  </ul>
+
+  <p class="empty" *ngIf="nothingMissing">{{ nothingMissingMessage }}</p>
+  <p class="error-message" *ngIf="errorMessage">{{ errorMessage }}</p>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button class="cancel" (click)="onCancel()">Cancel</button>
+  <button
+    *ngIf="!rows.length"
+    mat-raised-button
+    color="primary"
+    class="suggest"
+    [disabled]="loading"
+    (click)="onSuggest()"
+  >
+    Suggest items
+  </button>
+  <button
+    *ngIf="rows.length"
+    mat-raised-button
+    color="primary"
+    class="add"
+    [disabled]="!checkedCount"
+    (click)="onAdd()"
+  >
+    Add {{ checkedCount }}
+  </button>
+</mat-dialog-actions>
