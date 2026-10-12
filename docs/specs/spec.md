@@ -41,7 +41,7 @@ Lists are travel checklists. Each list has one or more sections.
 - A user can rename any section, including Ungrouped, by tapping its title, which opens a dialog with the current title pre-filled. A faint pencil glyph inside the title marks it as editable. The dialog rejects a blank title with an error and stays open. A title equal to the current one closes without writing. Titles are capped at 40 characters and duplicates are allowed, as they are when a section is created. The section keeps its id and its items.
 - A user can add items to any section.
 - A user can collapse or expand every section of a list at once with a single button on the list header, the first button after the share one. The button always shows the action it performs: `unfold_less` (collapse) while the sections are expanded, `unfold_more` (expand) while they are collapsed. Collapsed sections keep their title visible and hide their items and their "new item" field. The state is a view preference only — it is not stored, so reopening the list shows every section expanded.
-- A user can turn **checklist mode** on and off with a button on the list header (`playlist_add_check`), placed between the collapse-all button and the `+`. Unlike collapse-all, the button shows state rather than the next action: it is filled while the mode is on, with `aria-pressed` reflecting it. While the mode is on, tapping an item marks it ready — a light green row with bold dark-green text, and nothing else drawn — and tapping it again unmarks it. While the mode is off, taps do nothing and the marks stay visible: marks are saved data, not a view preference. The mode itself is not stored, so reopening a list starts with it off. Items are unmarked by default, a new item is always unmarked, and a section created from a group starts unmarked. An item keeps its mark when dragged to another section. On a shared list the marks are shared, like every other edit.
+- A user can turn **checklist mode** on and off with a button on the list header (`playlist_add_check`), placed between the collapse-all button and the suggestions button (`auto_awesome`, see **Item Recommender**). Unlike collapse-all, the button shows state rather than the next action: it is filled while the mode is on, with `aria-pressed` reflecting it. While the mode is on, tapping an item marks it ready — a light green row with bold dark-green text, and nothing else drawn — and tapping it again unmarks it. While the mode is off, taps do nothing and the marks stay visible: marks are saved data, not a view preference. The mode itself is not stored, so reopening a list starts with it off. Items are unmarked by default, a new item is always unmarked, and a section created from a group starts unmarked. An item keeps its mark when dragged to another section. On a shared list the marks are shared, like every other edit.
 - While checklist mode is on and at least one item is marked, a `remove_done` button on the header clears every mark on the list at once. It asks first — "Unmark all items?", with "12 items are marked as ready." naming the count — and clearing removes the marks only, leaving every item in place.
 - A user can drag items between sections within the same list.
 - A user can delete an item by dragging it to the trash.
@@ -79,7 +79,8 @@ fails is a change the user believes they made and did not.
 
 - When a write fails, a message names what was not saved: `Could not save the new item. Please
   try again.`, and likewise for the mark, the deletion, the new name, the new order, the moved
-  item, the new list, the new group, the new section(s), the cleared marks, the new note.
+  item, the new list, the new group, the new section(s), the cleared marks, the new note, the new
+  items (suggestions accepted together).
 - One user action, one message: clearing every mark rewrites a node per marked section and
   dragging an item between sections rewrites both of them, and each still reports once.
 - The message is dismissible and blocks nothing. Nothing on the screen becomes read-only, and
@@ -162,15 +163,19 @@ picked.
 - While the request is in flight the dialog shows a spinner. The spinner always resolves, on
   success or failure — it never spins indefinitely.
 - Each returned suggestion shows its name, the section it would go into (an existing section by
-  name, or a new one if no section matches) and a one-line reason, with a checkbox to include it.
-  Every suggestion starts checked.
+  name, or a new one if no section matches — tagged "new section") and a one-line reason, with a
+  checkbox to include it. Every suggestion starts checked. "Suggest items" gives way to "Add N" once
+  there are suggestions, N being how many are still checked; with none checked there is nothing to
+  add.
 - A suggestion never repeats an item already on the list, case-insensitively. At most 10
   suggestions are shown at once.
 - No suggestions at all is a valid result — it means the list looks complete — and is shown as
   "Nothing obvious missing.", not as an error.
 - Confirming adds every checked suggestion to the list: to the matching existing section by name
   (trimmed, case-insensitive), or to a newly created section named after the suggestion's section
-  otherwise. Added items are unmarked, like any new item. The dialog then closes.
+  otherwise. Suggestions naming the same new section, in any case, create it once. Added items are
+  unmarked, like any new item. The dialog then closes. A failed add is reported once for the whole
+  confirm, as "the new item" or "the new items".
 - A request is limited to 10 per user per day. Beyond that, the dialog shows "You've used today's
   suggestions. Try again tomorrow." and stays open.
 - A request that fails for any other reason shows "Could not get suggestions. Please try again."
@@ -180,6 +185,8 @@ picked.
   in **Saving**: a failed write reports "Could not save the new note." or the item's own message,
   and nothing on screen becomes read-only.
 - Available on private and shared lists alike, to anyone who can edit the list.
+- Signed out, nothing is sent and nothing is shown — the user is already on their way to the login
+  screen.
 
 ---
 

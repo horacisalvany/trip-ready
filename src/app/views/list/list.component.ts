@@ -8,8 +8,8 @@ import {
 } from '@angular/cdk/drag-drop';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
-import { Observable, forkJoin, of } from 'rxjs';
-import { take } from 'rxjs/operators';
+import { EMPTY, Observable, forkJoin, of } from 'rxjs';
+import { filter, switchMap, take, tap } from 'rxjs/operators';
 import { MaterialModule } from 'src/app/material.module';
 import { AuthService } from '../../services/auth.service';
 import { WriteFeedbackService } from '../../services/write-feedback.service';
@@ -32,7 +32,13 @@ import {
   DialogEditNoteComponent,
   EditNoteDialogData,
 } from './dialog-edit-note/dialog-edit-note.component';
-import { Item } from './item';
+import {
+  DialogSuggestItemsComponent,
+  SuggestItemsDialogData,
+} from './dialog-suggest-items/dialog-suggest-items.component';
+import { matchSection } from './dialog-suggest-items/suggestions';
+import { Suggestion } from '../../services/recommender.service';
+import { Item, unmarkedItems } from './item';
 import { ListService } from './list.service';
 import { Section } from './section';
 import { DRAG_START_DELAY } from '../drag-config';
@@ -382,13 +388,19 @@ export class ListComponent implements OnInit {
     return this.list?.tripNote ? 'Edit the trip note' : 'Add a trip note';
   }
 
-  /*
-    The one place the trip note is edited (F12). The dialog closes with
-    `undefined` when there is nothing to write and with '' for a cleared note,
-    which the service stores as no note at all.
-   */
   openNoteDialog(): void {
-    if (!this.list) return;
+    this.editNote().subscribe();
+  }
+
+  /*
+    The one place the trip note is edited (F12): the header affordance and the
+    suggestions dialog's pencil both come through here. Opens the edit dialog,
+    writes what it returns, and emits the saved note — '' once cleared, which the
+    service stores as no note at all. Emits nothing when there is nothing to
+    write, so a caller only ever hears about a note that changed.
+   */
+  private editNote(): Observable<string> {
+    if (!this.list) return EMPTY;
 
     const data: EditNoteDialogData = { note: this.list.tripNote };
     const dialogRef = this.dialog.open(DialogEditNoteComponent, {
@@ -396,13 +408,85 @@ export class ListComponent implements OnInit {
       data,
     });
 
-    dialogRef.afterClosed().subscribe((note: string | undefined) => {
-      if (note === undefined || !this.list) return;
-      const obs = this.isShared
-        ? this.listService.updateSharedTripNote(this.list.id, note)
-        : this.listService.updateTripNote(this.list.id, note);
-      this.writeFeedback.report(obs, 'the new note');
+    return dialogRef.afterClosed().pipe(
+      filter((note: string | undefined): note is string => note !== undefined && !!this.list),
+      tap((note) => {
+        const obs = this.isShared
+          ? this.listService.updateSharedTripNote(this.list!.id, note)
+          : this.listService.updateTripNote(this.list!.id, note);
+        this.writeFeedback.report(obs, 'the new note');
+      })
+    );
+  }
+
+  openSuggestDialog(): void {
+    if (!this.list) return;
+
+    const data: SuggestItemsDialogData = {
+      list: this.list,
+      editNote: () => this.editNote(),
+    };
+    const dialogRef = this.dialog.open(DialogSuggestItemsComponent, {
+      width: '360px',
+      data,
     });
+
+    dialogRef.afterClosed().subscribe((accepted: Suggestion[] | undefined) => {
+      if (!accepted?.length || !this.list) return;
+      this.addSuggestions(accepted);
+    });
+  }
+
+  /*
+    Adds accepted suggestions through the same writes as a typed item and a
+    titled section, so they arrive unmarked and fail the same way. Grouped by
+    the section they land in first: one write per existing section however many
+    suggestions it takes, and one new section per distinct name — "Toiletries"
+    and "toiletries" are the same section, named as the first one spells it.
+    Matched against the sections on screen now, not when the dialog opened.
+   */
+  private addSuggestions(accepted: Suggestion[]): void {
+    const sections = this.list!.sections;
+    const intoExisting = new Map<Section, string[]>();
+    const intoNew = new Map<string, { title: string; names: string[] }>();
+
+    accepted.forEach((suggestion) => {
+      const section = matchSection(sections, suggestion.section);
+      if (section) {
+        intoExisting.set(section, [...(intoExisting.get(section) ?? []), suggestion.name]);
+        return;
+      }
+      const title = suggestion.section.trim();
+      const key = title.toLowerCase();
+      const pending = intoNew.get(key) ?? { title, names: [] };
+      pending.names.push(suggestion.name);
+      intoNew.set(key, pending);
+    });
+
+    const writes: Observable<unknown>[] = [];
+    intoExisting.forEach((names, section) =>
+      writes.push(this.updateItems(section.id, [...section.items, ...unmarkedItems(names)]))
+    );
+    intoNew.forEach(({ title, names }) =>
+      writes.push(this.addSectionWithItems(title, unmarkedItems(names)))
+    );
+
+    const change = accepted.length === 1 ? 'the new item' : 'the new items';
+    this.writeFeedback.report(forkJoin(writes), change);
+  }
+
+  /*
+    A titled section, then its items: the two writes the add-sections dialog and
+    a typed item already make, chained. A null id means signed out — nothing was
+    created, so there is nothing to fill.
+   */
+  private addSectionWithItems(title: string, items: Item[]): Observable<unknown> {
+    const created = this.isShared
+      ? this.listService.addEmptySharedSectionToList(this.list!.id, title)
+      : this.listService.addEmptySectionToList(this.list!.id, title);
+    return created.pipe(
+      switchMap((sectionId) => (sectionId ? this.updateItems(sectionId, items) : of(undefined)))
+    );
   }
 
   dropTrash(event: CdkDragDrop<any>): void {
